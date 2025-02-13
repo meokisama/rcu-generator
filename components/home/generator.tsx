@@ -282,9 +282,9 @@ export default function Generator() {
 
   return (
     <div className="p-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="lg:grid grid-cols-2 gap-4">
         {/* Left Column - Input Form */}
-        <div className="space-y-4">
+        <div className="space-y-4 mb-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full">
               <TabsTrigger value="scene" className="flex-1">
