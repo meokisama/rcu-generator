@@ -200,62 +200,63 @@ export default function Generator() {
   };
 
   // Generate code based on active tab
-  const generateCode = (): string => {
+  const generateCode = React.useCallback((): string => {
+    const generateSceneCode = (): string => {
+      let code = "";
+      scenes.forEach((scene, sceneIndex) => {
+        code += `sceneObj[${sceneIndex}].amount = ${scene.amount};\n`;
+
+        if (scene.isSequential) {
+          code += `for(let i=0; i<sceneObj[${sceneIndex}].amount; i++) {\n`;
+          code += `\tsceneObj[${sceneIndex}].outputObj[i].type = OBJ_LIGHTING;\n`;
+          code += `\tsceneObj[${sceneIndex}].outputObj[i].group = i + ${scene.startGroup};\n`;
+          code += `\tsceneObj[${sceneIndex}].outputObj[i].value = ${scene.lights[0].value}*255/100;\n`;
+          code += `}\n`;
+        } else {
+          scene.lights.forEach((light, lightIndex) => {
+            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].type = OBJ_LIGHTING;\n`;
+            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].group = ${light.group};\n`;
+            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].value = ${light.value}*255/100;\n`;
+          });
+        }
+        code += "\n";
+      });
+      return code;
+    };
+
+    const generateScheduleCode = (): string => {
+      let code = "";
+      schedules.forEach((schedule, index) => {
+        code += `schedule[${index}].enable = ${schedule.enable ? 1 : 0};\n`;
+        code += `schedule[${index}].sceneAmount = ${schedule.sceneAmount};\n`;
+        schedule.sceneGroup.forEach((group, groupIndex) => {
+          code += `schedule[${index}].sceneGroup[${groupIndex}] = ${group};\n`;
+        });
+        code += "\n";
+        code += `schedule[${index}].monday = ${schedule.monday ? 1 : 0};\n`;
+        code += `schedule[${index}].tuesday = ${schedule.tuesday ? 1 : 0};\n`;
+        code += `schedule[${index}].wednesday = ${
+          schedule.wednesday ? 1 : 0
+        };\n`;
+        code += `schedule[${index}].thursday = ${schedule.thursday ? 1 : 0};\n`;
+        code += `schedule[${index}].friday = ${schedule.friday ? 1 : 0};\n`;
+        code += `schedule[${index}].saturday = ${schedule.saturday ? 1 : 0};\n`;
+        code += `schedule[${index}].sunday = ${schedule.sunday ? 1 : 0};\n`;
+        code += `schedule[${index}].hour = ${schedule.hour};\n`;
+        code += `schedule[${index}].minute = ${schedule.minute};\n\n`;
+      });
+      return code;
+    };
     if (activeTab === "scene") {
       return generateSceneCode();
     } else {
       return generateScheduleCode();
     }
-  };
-
-  const generateSceneCode = (): string => {
-    let code = "";
-    scenes.forEach((scene, sceneIndex) => {
-      code += `sceneObj[${sceneIndex}].amount = ${scene.amount};\n`;
-
-      if (scene.isSequential) {
-        code += `for(let i=0; i<sceneObj[${sceneIndex}].amount; i++) {\n`;
-        code += `\tsceneObj[${sceneIndex}].outputObj[i].type = OBJ_LIGHTING;\n`;
-        code += `\tsceneObj[${sceneIndex}].outputObj[i].group = i + ${scene.startGroup};\n`;
-        code += `\tsceneObj[${sceneIndex}].outputObj[i].value = ${scene.lights[0].value}*255/100;\n`;
-        code += `}\n`;
-      } else {
-        scene.lights.forEach((light, lightIndex) => {
-          code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].type = OBJ_LIGHTING;\n`;
-          code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].group = ${light.group};\n`;
-          code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].value = ${light.value}*255/100;\n`;
-        });
-      }
-      code += "\n";
-    });
-    return code;
-  };
-
-  const generateScheduleCode = (): string => {
-    let code = "";
-    schedules.forEach((schedule, index) => {
-      code += `schedule[${index}].enable = ${schedule.enable ? 1 : 0};\n`;
-      code += `schedule[${index}].sceneAmount = ${schedule.sceneAmount};\n`;
-      schedule.sceneGroup.forEach((group, groupIndex) => {
-        code += `schedule[${index}].sceneGroup[${groupIndex}] = ${group};\n`;
-      });
-      code += "\n";
-      code += `schedule[${index}].monday = ${schedule.monday ? 1 : 0};\n`;
-      code += `schedule[${index}].tuesday = ${schedule.tuesday ? 1 : 0};\n`;
-      code += `schedule[${index}].wednesday = ${schedule.wednesday ? 1 : 0};\n`;
-      code += `schedule[${index}].thursday = ${schedule.thursday ? 1 : 0};\n`;
-      code += `schedule[${index}].friday = ${schedule.friday ? 1 : 0};\n`;
-      code += `schedule[${index}].saturday = ${schedule.saturday ? 1 : 0};\n`;
-      code += `schedule[${index}].sunday = ${schedule.sunday ? 1 : 0};\n`;
-      code += `schedule[${index}].hour = ${schedule.hour};\n`;
-      code += `schedule[${index}].minute = ${schedule.minute};\n\n`;
-    });
-    return code;
-  };
+  }, [activeTab, scenes, schedules]);
 
   useEffect(() => {
     setGeneratedCode(generateCode());
-  }, [scenes, schedules, activeTab]);
+  }, [scenes, schedules, activeTab, generateCode]);
 
   return (
     <div className="p-4">
