@@ -1,6 +1,12 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -8,6 +14,8 @@ import { Copy } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Terminal } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface Light {
   group: number;
@@ -190,15 +198,15 @@ export default function Generator() {
     setSchedules(newSchedules);
   };
 
-  const handleSceneGroupChange = (
-    scheduleIndex: number,
-    groupIndex: number,
-    value: string
-  ) => {
-    const newSchedules = [...schedules];
-    newSchedules[scheduleIndex].sceneGroup[groupIndex] = parseInt(value) || 1;
-    setSchedules(newSchedules);
-  };
+  // const handleSceneGroupChange = (
+  //   scheduleIndex: number,
+  //   groupIndex: number,
+  //   value: string
+  // ) => {
+  //   const newSchedules = [...schedules];
+  //   newSchedules[scheduleIndex].sceneGroup[groupIndex] = parseInt(value) || 1;
+  //   setSchedules(newSchedules);
+  // };
 
   // Generate code based on active tab
   const generateCode = React.useCallback((): string => {
@@ -255,6 +263,19 @@ export default function Generator() {
     }
   }, [activeTab, scenes, schedules]);
 
+  const handleSceneSelection = (
+    scheduleIndex: number,
+    selectedScenes: number[]
+  ) => {
+    const newSchedules = [...schedules];
+    newSchedules[scheduleIndex] = {
+      ...newSchedules[scheduleIndex],
+      sceneAmount: selectedScenes.length,
+      sceneGroup: selectedScenes,
+    };
+    setSchedules(newSchedules);
+  };
+
   useEffect(() => {
     setGeneratedCode(generateCode());
   }, [scenes, schedules, activeTab, generateCode]);
@@ -267,10 +288,10 @@ export default function Generator() {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full">
               <TabsTrigger value="scene" className="flex-1">
-                Ngữ cảnh
+                Ngữ cảnh (Scene)
               </TabsTrigger>
               <TabsTrigger value="schedule" className="flex-1">
-                Lịch trình
+                Lịch trình (Schedule)
               </TabsTrigger>
             </TabsList>
 
@@ -279,19 +300,23 @@ export default function Generator() {
                 <CardContent className="pt-6">
                   <div className="space-y-4">
                     <div>
-                      <Label>Số lượng ngữ cảnh:</Label>
+                      <Label>Số lượng Scene cần tạo:</Label>
                       <Input
                         type="number"
                         min="1"
                         value={numScenes}
                         onChange={handleNumScenesChange}
+                        className="mt-2"
                       />
                     </div>
 
                     {scenes.map((scene, sceneIndex) => (
-                      <div key={sceneIndex} className="border p-4 rounded-lg">
-                        <h3 className="font-medium mb-2">
-                          Ngữ cảnh {sceneIndex + 1}
+                      <div
+                        key={sceneIndex}
+                        className="border p-4 rounded-lg shadow-md"
+                      >
+                        <h3 className="font-bold mb-4 text-red-600">
+                          Scene {sceneIndex + 1}
                         </h3>
 
                         <div className="flex items-center space-x-2 mb-4">
@@ -301,12 +326,30 @@ export default function Generator() {
                               handleSequentialToggle(sceneIndex)
                             }
                           />
-                          <Label>Địa chỉ liên tục</Label>
+                          <Label>Group đèn liên tục</Label>
                         </div>
+
+                        <Alert className="mb-4">
+                          <Terminal className="h-4 w-4" />
+                          <AlertTitle className="font-bold">
+                            Các anh chú ý!
+                          </AlertTitle>
+                          <AlertDescription>
+                            Nếu scene cần tạo có line đèn là các địa chỉ group
+                            liên tiếp nhau một mạch, ví dụ từ group 1 → group
+                            10, thì bật chế độ{" "}
+                            <strong className="text-red-700">
+                              Group đèn liên tục
+                            </strong>{" "}
+                            này lên. Và, độ sáng các đèn này phải đồng nhất bằng
+                            nhau thì mới được, còn các đèn độ sáng khác nhau thì
+                            hãy tắt cái này và điền thủ công bên dưới.
+                          </AlertDescription>
+                        </Alert>
 
                         <div className="space-y-4">
                           <div>
-                            <Label>Số lượng đèn:</Label>
+                            <Label>Số line đèn:</Label>
                             <Input
                               type="number"
                               min="1"
@@ -320,7 +363,7 @@ export default function Generator() {
                           {scene.isSequential ? (
                             <div className="space-y-4">
                               <div>
-                                <Label>Địa chỉ bắt đầu:</Label>
+                                <Label>Group bắt đầu:</Label>
                                 <Input
                                   type="number"
                                   min="1"
@@ -358,7 +401,7 @@ export default function Generator() {
                                 className="grid grid-cols-2 gap-4"
                               >
                                 <div>
-                                  <Label>Nhóm đèn {lightIndex + 1}:</Label>
+                                  <Label>Group Đèn {lightIndex + 1}:</Label>
                                   <Input
                                     type="number"
                                     min="1"
@@ -374,7 +417,9 @@ export default function Generator() {
                                   />
                                 </div>
                                 <div>
-                                  <Label>Độ sáng (%) {lightIndex + 1}:</Label>
+                                  <Label>
+                                    Độ sáng (%) Đèn {lightIndex + 1}:
+                                  </Label>
                                   <Input
                                     type="number"
                                     min="0"
@@ -406,22 +451,23 @@ export default function Generator() {
                 <CardContent className="pt-6">
                   <div className="space-y-4">
                     <div>
-                      <Label>Số lượng lịch trình:</Label>
+                      <Label>Số lượng Schedule cần tạo:</Label>
                       <Input
                         type="number"
                         min="1"
                         value={numSchedules}
                         onChange={handleNumSchedulesChange}
+                        className="mt-2"
                       />
                     </div>
 
                     {schedules.map((schedule, scheduleIndex) => (
                       <div
                         key={scheduleIndex}
-                        className="border p-4 rounded-lg space-y-4"
+                        className="border p-4 rounded-lg space-y-4 shadow-md"
                       >
-                        <h3 className="font-medium">
-                          Lịch trình {scheduleIndex + 1}
+                        <h3 className="font-bold mb-4 text-red-600">
+                          Schedule {scheduleIndex + 1}
                         </h3>
 
                         <div className="flex items-center space-x-2">
@@ -438,8 +484,40 @@ export default function Generator() {
                           <Label>Kích hoạt</Label>
                         </div>
 
-                        <div>
-                          <Label>Số lượng scene:</Label>
+                        <div className="space-y-2">
+                          <Label className="font-bold">
+                            Chọn các Scene cho Schedule này:
+                          </Label>
+                          <div className="grid grid-cols-2 gap-2 p-4 border rounded-lg bg-gray-50">
+                            {Array.from({ length: numScenes }, (_, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center space-x-2"
+                              >
+                                <Checkbox
+                                  checked={schedule.sceneGroup.includes(i + 1)}
+                                  onCheckedChange={(checked) => {
+                                    const newSelection = checked
+                                      ? [...schedule.sceneGroup, i + 1].sort(
+                                          (a, b) => a - b
+                                        )
+                                      : schedule.sceneGroup.filter(
+                                          (num) => num !== i + 1
+                                        );
+                                    handleSceneSelection(
+                                      scheduleIndex,
+                                      newSelection
+                                    );
+                                  }}
+                                />
+                                <Label>Scene {i + 1}</Label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* <div>
+                          <Label>Số lượng Scene của Schedule:</Label>
                           <Input
                             type="number"
                             min="1"
@@ -452,11 +530,28 @@ export default function Generator() {
                               )
                             }
                           />
-                        </div>
+                        </div> */}
 
-                        {schedule.sceneGroup.map((group, groupIndex) => (
+                        <Alert>
+                          <Terminal className="h-4 w-4" />
+                          <AlertTitle className="font-bold">
+                            Các anh chú ý!
+                          </AlertTitle>
+                          <AlertDescription>
+                            Ở phần chọn Scene này sẽ liệt kê{" "}
+                            <strong className="text-red-700">
+                              tất cả các scene đã được tạo
+                            </strong>{" "}
+                            ở tab Ngữ cảnh (Scene) bên trên, và giờ chỉ cần tick
+                            chọn những scene tương ứng cho Schedule này là được.
+                          </AlertDescription>
+                        </Alert>
+
+                        {/* {schedule.sceneGroup.map((group, groupIndex) => (
                           <div key={groupIndex}>
-                            <Label>Ngữ cảnh {groupIndex + 1}:</Label>
+                            <Label className="font-bold">
+                              Scene {groupIndex + 1}:
+                            </Label>
                             <Input
                               type="number"
                               min="1"
@@ -470,11 +565,11 @@ export default function Generator() {
                               }
                             />
                           </div>
-                        ))}
+                        ))} */}
 
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <Label>Giờ:</Label>
+                            <Label>Giờ kích hoạt:</Label>
                             <Input
                               type="number"
                               min="0"
@@ -490,7 +585,7 @@ export default function Generator() {
                             />
                           </div>
                           <div>
-                            <Label>Phút:</Label>
+                            <Label>Phút (nếu có):</Label>
                             <Input
                               type="number"
                               min="0"
@@ -547,10 +642,10 @@ export default function Generator() {
         </div>
 
         {/* Right Column - Generated Code */}
-        <Card>
+        <Card className="shadow-md">
           <CardHeader>
             <div className="flex justify-between items-center">
-              <CardTitle>Mã được tạo</CardTitle>
+              <CardTitle>Copy gửi anh Hoài An</CardTitle>
               <Button
                 variant="outline"
                 size="icon"
@@ -565,6 +660,18 @@ export default function Generator() {
               {generatedCode}
             </pre>
           </CardContent>
+          <CardFooter>
+            <Alert>
+              <Terminal className="h-4 w-4" />
+              <AlertTitle className="font-bold">Các anh chú ý!</AlertTitle>
+              <AlertDescription>
+                Để tránh rườm rà khó nhìn giữa hai bước nên phần code sẽ được
+                hiển thị tách biệt giữ Scene và Schedule, tức là phải copy 2
+                lần, một lần copy cho Scene và một lần copy cho Schedule. Rồi
+                mới gửi cho anh Hoài An.
+              </AlertDescription>
+            </Alert>
+          </CardFooter>
         </Card>
       </div>
     </div>
