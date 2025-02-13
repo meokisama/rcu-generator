@@ -167,6 +167,7 @@ export default function Generator() {
   const handleScheduleChange = (
     scheduleIndex: number,
     field: keyof Schedule,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     value: any
   ) => {
     const newSchedules = [...schedules];
@@ -184,7 +185,7 @@ export default function Generator() {
         ].sceneGroup.slice(0, amount);
       }
     } else {
-      newSchedules[scheduleIndex][field] = value;
+      newSchedules[scheduleIndex][field as keyof Schedule] = value as never;
     }
     setSchedules(newSchedules);
   };
