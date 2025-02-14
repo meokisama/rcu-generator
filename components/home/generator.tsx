@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Copy } from "lucide-react";
+import { Copy, Download, Plus, Trash2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -208,59 +208,59 @@ export default function Generator() {
   //   setSchedules(newSchedules);
   // };
 
+  const generateSceneCode = (): string => {
+    let code = "";
+    scenes.forEach((scene, sceneIndex) => {
+      code += `sceneObj[${sceneIndex}].amount = ${scene.amount};\n`;
+
+      if (scene.isSequential) {
+        code += `for(int i=0; i<sceneObj[${sceneIndex}].amount; i++) {\n`;
+        code += `\tsceneObj[${sceneIndex}].outputObj[i].type = OBJ_LIGHTING;\n`;
+        code += `\tsceneObj[${sceneIndex}].outputObj[i].group = i + ${scene.startGroup};\n`;
+        code += `\tsceneObj[${sceneIndex}].outputObj[i].value = ${scene.lights[0].value}*255/100;\n`;
+        code += `}\n`;
+      } else {
+        scene.lights.forEach((light, lightIndex) => {
+          code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].type = OBJ_LIGHTING;\n`;
+          code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].group = ${light.group};\n`;
+          code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].value = ${light.value}*255/100;\n`;
+        });
+      }
+      code += "\n";
+    });
+    return code;
+  };
+
+  const generateScheduleCode = (): string => {
+    let code = "";
+    schedules.forEach((schedule, index) => {
+      code += `schedule[${index}].enable = ${schedule.enable ? 1 : 0};\n`;
+      code += `schedule[${index}].sceneAmount = ${schedule.sceneAmount};\n`;
+      schedule.sceneGroup.forEach((group, groupIndex) => {
+        code += `schedule[${index}].sceneGroup[${groupIndex}] = ${group};\n`;
+      });
+      code += "\n";
+      code += `schedule[${index}].monday = ${schedule.monday ? 1 : 0};\n`;
+      code += `schedule[${index}].tuesday = ${schedule.tuesday ? 1 : 0};\n`;
+      code += `schedule[${index}].wednesday = ${schedule.wednesday ? 1 : 0};\n`;
+      code += `schedule[${index}].thursday = ${schedule.thursday ? 1 : 0};\n`;
+      code += `schedule[${index}].friday = ${schedule.friday ? 1 : 0};\n`;
+      code += `schedule[${index}].saturday = ${schedule.saturday ? 1 : 0};\n`;
+      code += `schedule[${index}].sunday = ${schedule.sunday ? 1 : 0};\n`;
+      code += `schedule[${index}].hour = ${schedule.hour};\n`;
+      code += `schedule[${index}].minute = ${schedule.minute};\n\n`;
+    });
+    return code;
+  };
+
   // Generate code based on active tab
   const generateCode = React.useCallback((): string => {
-    const generateSceneCode = (): string => {
-      let code = "";
-      scenes.forEach((scene, sceneIndex) => {
-        code += `sceneObj[${sceneIndex}].amount = ${scene.amount};\n`;
-
-        if (scene.isSequential) {
-          code += `for(let i=0; i<sceneObj[${sceneIndex}].amount; i++) {\n`;
-          code += `\tsceneObj[${sceneIndex}].outputObj[i].type = OBJ_LIGHTING;\n`;
-          code += `\tsceneObj[${sceneIndex}].outputObj[i].group = i + ${scene.startGroup};\n`;
-          code += `\tsceneObj[${sceneIndex}].outputObj[i].value = ${scene.lights[0].value}*255/100;\n`;
-          code += `}\n`;
-        } else {
-          scene.lights.forEach((light, lightIndex) => {
-            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].type = OBJ_LIGHTING;\n`;
-            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].group = ${light.group};\n`;
-            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].value = ${light.value}*255/100;\n`;
-          });
-        }
-        code += "\n";
-      });
-      return code;
-    };
-
-    const generateScheduleCode = (): string => {
-      let code = "";
-      schedules.forEach((schedule, index) => {
-        code += `schedule[${index}].enable = ${schedule.enable ? 1 : 0};\n`;
-        code += `schedule[${index}].sceneAmount = ${schedule.sceneAmount};\n`;
-        schedule.sceneGroup.forEach((group, groupIndex) => {
-          code += `schedule[${index}].sceneGroup[${groupIndex}] = ${group};\n`;
-        });
-        code += "\n";
-        code += `schedule[${index}].monday = ${schedule.monday ? 1 : 0};\n`;
-        code += `schedule[${index}].tuesday = ${schedule.tuesday ? 1 : 0};\n`;
-        code += `schedule[${index}].wednesday = ${
-          schedule.wednesday ? 1 : 0
-        };\n`;
-        code += `schedule[${index}].thursday = ${schedule.thursday ? 1 : 0};\n`;
-        code += `schedule[${index}].friday = ${schedule.friday ? 1 : 0};\n`;
-        code += `schedule[${index}].saturday = ${schedule.saturday ? 1 : 0};\n`;
-        code += `schedule[${index}].sunday = ${schedule.sunday ? 1 : 0};\n`;
-        code += `schedule[${index}].hour = ${schedule.hour};\n`;
-        code += `schedule[${index}].minute = ${schedule.minute};\n\n`;
-      });
-      return code;
-    };
     if (activeTab === "scene") {
       return generateSceneCode();
     } else {
       return generateScheduleCode();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, scenes, schedules]);
 
   const handleSceneSelection = (
@@ -276,12 +276,96 @@ export default function Generator() {
     setSchedules(newSchedules);
   };
 
+  const handleAddScene = () => {
+    setNumScenes((prev) => prev + 1);
+    setScenes((prev) => [
+      ...prev,
+      {
+        amount: 1,
+        lights: [{ group: 1, value: 100 }],
+        isSequential: false,
+      },
+    ]);
+  };
+
+  const handleAddSchedule = () => {
+    setNumSchedules((prev) => prev + 1);
+    setSchedules((prev) => [
+      ...prev,
+      {
+        enable: true,
+        sceneAmount: 1,
+        sceneGroup: [1],
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true,
+        saturday: true,
+        sunday: true,
+        hour: 0,
+        minute: 0,
+      },
+    ]);
+  };
+
+  const handleDownload = () => {
+    const sceneCode = generateSceneCode();
+    const scheduleCode = generateScheduleCode();
+    const fullCode = `// Scene Configuration\n${sceneCode}\n// Schedule Configuration\n${scheduleCode}`;
+
+    // Create blob and download
+    const blob = new Blob([fullCode], { type: "text/plain" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "scene-schedule.txt";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
+  // Delete handlers
+  const handleDeleteScene = (sceneIndex: number) => {
+    if (scenes.length > 1) {
+      const newScenes = scenes.filter((_, index) => index !== sceneIndex);
+      setScenes(newScenes);
+      setNumScenes((prev) => prev - 1);
+
+      // Update schedules to remove references to the deleted scene
+      const deletedSceneNumber = sceneIndex + 1;
+      const newSchedules = schedules.map((schedule) => {
+        const newSceneGroup = schedule.sceneGroup
+          .filter((group) => group !== deletedSceneNumber)
+          .map((group) => (group > deletedSceneNumber ? group - 1 : group));
+
+        return {
+          ...schedule,
+          sceneGroup: newSceneGroup,
+          sceneAmount: newSceneGroup.length,
+        };
+      });
+      setSchedules(newSchedules);
+    }
+  };
+
+  const handleDeleteSchedule = (scheduleIndex: number) => {
+    if (schedules.length > 1) {
+      const newSchedules = schedules.filter(
+        (_, index) => index !== scheduleIndex
+      );
+      setSchedules(newSchedules);
+      setNumSchedules((prev) => prev - 1);
+    }
+  };
+
   useEffect(() => {
     setGeneratedCode(generateCode());
   }, [scenes, schedules, activeTab, generateCode]);
 
   return (
-    <div className="p-4">
+    <div className="p-4 lg:px-10">
       <div className="lg:grid grid-cols-2 gap-4">
         {/* Left Column - Input Form */}
         <div className="space-y-4 mb-4">
@@ -313,12 +397,23 @@ export default function Generator() {
                     {scenes.map((scene, sceneIndex) => (
                       <div
                         key={sceneIndex}
-                        className="border p-4 rounded-lg shadow-md"
+                        className="border p-4 rounded-lg shadow-md relative"
                       >
-                        <h3 className="font-bold mb-4 text-red-600 lg:text-lg">
-                          Scene {sceneIndex + 1}
-                        </h3>
-
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-bold mb-4 text-red-600 lg:text-lg">
+                            Scene {sceneIndex + 1}
+                          </h3>
+                          {scenes.length > 1 && (
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              onClick={() => handleDeleteScene(sceneIndex)}
+                              className="absolute top-2 right-2"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                         <div className="flex items-center space-x-2 mb-4">
                           <Switch
                             checked={scene.isSequential}
@@ -442,6 +537,15 @@ export default function Generator() {
                       </div>
                     ))}
                   </div>
+                  <div className="mt-10 w-full">
+                    <Button
+                      onClick={handleAddScene}
+                      className="flex items-center gap-2 w-full"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Thêm Scene
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -464,11 +568,25 @@ export default function Generator() {
                     {schedules.map((schedule, scheduleIndex) => (
                       <div
                         key={scheduleIndex}
-                        className="border p-4 rounded-lg space-y-4 shadow-md"
+                        className="border p-4 rounded-lg space-y-4 shadow-md relative"
                       >
-                        <h3 className="font-bold mb-4 lg:text-lg text-red-600">
-                          Schedule {scheduleIndex + 1}
-                        </h3>
+                        <div className="flex justify-between items-center mb-4">
+                          <h3 className="font-bold mb-4 lg:text-lg text-red-600">
+                            Schedule {scheduleIndex + 1}
+                          </h3>
+                          {schedules.length > 1 && (
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              onClick={() =>
+                                handleDeleteSchedule(scheduleIndex)
+                              }
+                              className="absolute top-2 right-2 shadow-md"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
 
                         <div className="flex items-center space-x-2">
                           <Switch
@@ -633,6 +751,15 @@ export default function Generator() {
                       </div>
                     ))}
                   </div>
+                  <div className="mt-6 w-full">
+                    <Button
+                      onClick={handleAddSchedule}
+                      className="flex items-center gap-2 w-full"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Thêm Schedule
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -640,37 +767,56 @@ export default function Generator() {
         </div>
 
         {/* Right Column - Generated Code */}
-        <Card className="shadow-md">
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <CardTitle>Copy gửi anh Hoài An</CardTitle>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => navigator.clipboard.writeText(generatedCode)}
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <pre className="bg-gray-100 p-4 rounded-lg overflow-auto">
-              {generatedCode}
-            </pre>
-          </CardContent>
-          <CardFooter>
-            <Alert>
-              <Terminal className="h-4 w-4" />
-              <AlertTitle className="font-bold">Các anh chú ý!</AlertTitle>
-              <AlertDescription>
-                Để tránh rườm rà khó nhìn giữa hai bước nên phần code sẽ được
-                hiển thị tách biệt giữ Scene và Schedule, tức là phải copy 2
-                lần, một lần copy cho Scene và một lần copy cho Schedule. Rồi
-                mới gửi cho anh Hoài An.
-              </AlertDescription>
-            </Alert>
-          </CardFooter>
-        </Card>
+        <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
+          <Card className="shadow-md flex flex-col h-full">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>Gửi anh Hoài An</CardTitle>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => navigator.clipboard.writeText(generatedCode)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleDownload}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-auto">
+              <div className="h-full p-4 bg-gray-100 rounded-lg">
+                <pre className="p-4 h-full overflow-auto">{generatedCode}</pre>
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Alert>
+                <Terminal className="h-4 w-4" />
+                <AlertTitle className="font-bold">Các anh chú ý!</AlertTitle>
+                <AlertDescription>
+                  Phần code được tạo tự động có 2 nút chức năng là{" "}
+                  <strong className="text-red-600">Copy</strong> và
+                  <strong className="text-red-600"> Download</strong>. <br />
+                  - Copy sẽ chỉ copy mã code của tab hiện tại, tức là chỉ Scene
+                  hoặc chỉ Schedule. <br />- Download sẽ ghép cả hai phần này
+                  lại và lưu lại thành file &apos;
+                  <strong>scene-schedule.txt</strong>&apos;. <br />
+                  <>
+                    Các anh thêm scene & schedule xong xuôi rồi ấn{" "}
+                    <strong className="text-red-600">Download</strong> và gửi
+                    file này cho anh Hoài An là được.
+                  </>
+                </AlertDescription>
+              </Alert>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
     </div>
   );
