@@ -214,10 +214,10 @@ export default function Generator() {
       code += `sceneObj[${sceneIndex}].amount = ${scene.amount};\n`;
 
       if (scene.isSequential) {
-        code += `for(int i=0; i<sceneObj[${sceneIndex}].amount; i++) {\n`;
-        code += `\tsceneObj[${sceneIndex}].outputObj[i].type = OBJ_LIGHTING;\n`;
-        code += `\tsceneObj[${sceneIndex}].outputObj[i].group = i + ${scene.startGroup};\n`;
-        code += `\tsceneObj[${sceneIndex}].outputObj[i].value = ${scene.lights[0].value}*255/100;\n`;
+        code += `for(UINT8 j=0; j<sceneObj[${sceneIndex}].amount; j++) {\n`;
+        code += `\tsceneObj[${sceneIndex}].outputObj[j].type = OBJ_LIGHTING;\n`;
+        code += `\tsceneObj[${sceneIndex}].outputObj[j].group = j + ${scene.startGroup};\n`;
+        code += `\tsceneObj[${sceneIndex}].outputObj[j].value = ${scene.lights[0].value}*255/100;\n`;
         code += `}\n`;
       } else {
         scene.lights.forEach((light, lightIndex) => {
