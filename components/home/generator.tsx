@@ -767,7 +767,7 @@ export default function Generator() {
         </div>
 
         {/* Right Column - Generated Code */}
-        <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">
+        <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]">
           <Card className="shadow-md flex flex-col h-full">
             <CardHeader>
               <div className="flex justify-between items-center">
