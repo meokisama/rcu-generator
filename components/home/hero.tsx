@@ -19,7 +19,7 @@ export default function Hero() {
           <Image
             src="/uwu.png"
             alt="UwU Solutions"
-            width={250}
+            width={200}
             height={154}
             quality={100}
             className="h-auto absolute bottom-0 right-10 hidden sm:block"
