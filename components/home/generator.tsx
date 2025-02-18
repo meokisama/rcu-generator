@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Copy, Download, Plus, Trash2 } from "lucide-react";
+import { Copy, Download, Plus, Trash2, SquarePen } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,6 +23,7 @@ interface Light {
 }
 
 interface Scene {
+  name: string;
   amount: number;
   lights: Light[];
   isSequential: boolean;
@@ -30,6 +31,7 @@ interface Scene {
 }
 
 interface Schedule {
+  name: string;
   enable: boolean;
   sceneAmount: number;
   sceneGroup: number[];
@@ -49,6 +51,7 @@ export default function Generator() {
   const [numScenes, setNumScenes] = useState<number>(1);
   const [scenes, setScenes] = useState<Scene[]>([
     {
+      name: "Scene 1",
       amount: 1,
       lights: [{ group: 1, value: 100 }],
       isSequential: false,
@@ -59,6 +62,7 @@ export default function Generator() {
   const [numSchedules, setNumSchedules] = useState<number>(1);
   const [schedules, setSchedules] = useState<Schedule[]>([
     {
+      name: "Schedule 1",
       enable: true,
       sceneAmount: 1,
       sceneGroup: [1],
@@ -85,12 +89,45 @@ export default function Generator() {
     const newScenes = Array(num)
       .fill(null)
       .map((_, i) => ({
+        name: scenes[i]?.name || `Scene ${i + 1}`,
         amount: scenes[i]?.amount || 1,
         lights: scenes[i]?.lights || [{ group: 1, value: 100 }],
         isSequential: scenes[i]?.isSequential || false,
         startGroup: scenes[i]?.startGroup || 1,
       }));
     setScenes(newScenes);
+  };
+
+  const handleSceneNameChange = (sceneIndex: number, name: string) => {
+    const newScenes = [...scenes];
+    newScenes[sceneIndex].name = name;
+    setScenes(newScenes);
+  };
+
+  const handleScheduleNameChange = (scheduleIndex: number, name: string) => {
+    const newSchedules = [...schedules];
+    newSchedules[scheduleIndex].name = name;
+    setSchedules(newSchedules);
+  };
+
+  const handleCopyScene = (sceneIndex: number) => {
+    const sceneToCopy = scenes[sceneIndex];
+    const newScene = {
+      ...sceneToCopy,
+      name: `${sceneToCopy.name} (Copy)`,
+    };
+    setScenes([...scenes, newScene]);
+    setNumScenes(scenes.length + 1);
+  };
+
+  const handleCopySchedule = (scheduleIndex: number) => {
+    const scheduleToCopy = schedules[scheduleIndex];
+    const newSchedule = {
+      ...scheduleToCopy,
+      name: `${scheduleToCopy.name} (Copy)`,
+    };
+    setSchedules([...schedules, newSchedule]);
+    setNumSchedules(schedules.length + 1);
   };
 
   const handleAmountChange = (sceneIndex: number, value: string) => {
@@ -198,19 +235,10 @@ export default function Generator() {
     setSchedules(newSchedules);
   };
 
-  // const handleSceneGroupChange = (
-  //   scheduleIndex: number,
-  //   groupIndex: number,
-  //   value: string
-  // ) => {
-  //   const newSchedules = [...schedules];
-  //   newSchedules[scheduleIndex].sceneGroup[groupIndex] = parseInt(value) || 1;
-  //   setSchedules(newSchedules);
-  // };
-
   const generateSceneCode = (): string => {
     let code = "";
     scenes.forEach((scene, sceneIndex) => {
+      code += `// ${scene.name}\n`;
       code += `sceneObj[${sceneIndex}].amount = ${scene.amount};\n`;
 
       if (scene.isSequential) {
@@ -234,6 +262,7 @@ export default function Generator() {
   const generateScheduleCode = (): string => {
     let code = "";
     schedules.forEach((schedule, index) => {
+      code += `// ${schedule.name}\n`;
       code += `schedule[${index}].enable = ${schedule.enable ? 1 : 0};\n`;
       code += `schedule[${index}].sceneAmount = ${schedule.sceneAmount};\n`;
       schedule.sceneGroup.forEach((group, groupIndex) => {
@@ -281,6 +310,7 @@ export default function Generator() {
     setScenes((prev) => [
       ...prev,
       {
+        name: `Scene ${prev.length + 1}`,
         amount: 1,
         lights: [{ group: 1, value: 100 }],
         isSequential: false,
@@ -293,6 +323,7 @@ export default function Generator() {
     setSchedules((prev) => [
       ...prev,
       {
+        name: `Schedule ${prev.length + 1}`,
         enable: true,
         sceneAmount: 1,
         sceneGroup: [1],
@@ -400,19 +431,39 @@ export default function Generator() {
                         className="border p-4 rounded-lg shadow-md relative"
                       >
                         <div className="flex justify-between items-center mb-4">
-                          <h3 className="font-bold mb-4 text-red-600 lg:text-lg">
-                            Scene {sceneIndex + 1}
-                          </h3>
-                          {scenes.length > 1 && (
+                          <div className="flex-1 mr-6 lg:mr-12 mb-2 relative">
+                            <SquarePen className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                            <Input
+                              value={scene.name}
+                              onChange={(e) =>
+                                handleSceneNameChange(
+                                  sceneIndex,
+                                  e.target.value
+                                )
+                              }
+                              className="font-bold text-red-600 lg:text-lg shadow-sm pl-8"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            {scenes.length > 1 && (
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                onClick={() => handleDeleteScene(sceneIndex)}
+                                className="shadow-sm"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
-                              variant="destructive"
+                              variant="outline"
                               size="icon"
-                              onClick={() => handleDeleteScene(sceneIndex)}
-                              className="absolute top-2 right-2"
+                              onClick={() => handleCopyScene(sceneIndex)}
+                              className="shadow-sm"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Copy className="h-4 w-4" />
                             </Button>
-                          )}
+                          </div>
                         </div>
                         <div className="flex items-center space-x-2 mb-4">
                           <Switch
@@ -456,7 +507,7 @@ export default function Generator() {
                           </div>
 
                           {scene.isSequential ? (
-                            <div className="space-y-4">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                               <div>
                                 <Label>Group bắt đầu:</Label>
                                 <Input
@@ -472,7 +523,7 @@ export default function Generator() {
                                 />
                               </div>
                               <div>
-                                <Label>Độ sáng (%):</Label>
+                                <Label>Độ sáng các đèn (%):</Label>
                                 <Input
                                   type="number"
                                   min="0"
@@ -493,7 +544,7 @@ export default function Generator() {
                             scene.lights.map((light, lightIndex) => (
                               <div
                                 key={lightIndex}
-                                className="grid grid-cols-2 gap-4"
+                                className="grid grid-cols-1 lg:grid-cols-2 gap-4"
                               >
                                 <div>
                                   <Label>Group Đèn {lightIndex + 1}:</Label>
@@ -571,21 +622,41 @@ export default function Generator() {
                         className="border p-4 rounded-lg space-y-4 shadow-md relative"
                       >
                         <div className="flex justify-between items-center mb-4">
-                          <h3 className="font-bold mb-4 lg:text-lg text-red-600">
-                            Schedule {scheduleIndex + 1}
-                          </h3>
-                          {schedules.length > 1 && (
-                            <Button
-                              variant="destructive"
-                              size="icon"
-                              onClick={() =>
-                                handleDeleteSchedule(scheduleIndex)
+                          <div className="flex-1 mr-6 lg:mr-12 mb-2 relative">
+                            <SquarePen className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                            <Input
+                              value={schedule.name}
+                              onChange={(e) =>
+                                handleScheduleNameChange(
+                                  scheduleIndex,
+                                  e.target.value
+                                )
                               }
-                              className="absolute top-2 right-2 shadow-md"
+                              className="font-bold text-red-600 lg:text-lg shadow-sm pl-8"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            {schedules.length > 1 && (
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                onClick={() =>
+                                  handleDeleteSchedule(scheduleIndex)
+                                }
+                                className="shadow-sm"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleCopySchedule(scheduleIndex)}
+                              className="shadow-sm"
                             >
-                              <Trash2 className="h-4 w-4" />
+                              <Copy className="h-4 w-4" />
                             </Button>
-                          )}
+                          </div>
                         </div>
 
                         <div className="flex items-center space-x-2">
@@ -605,7 +676,7 @@ export default function Generator() {
                         <div className="space-y-2">
                           <Label>Chọn các Scene cho Schedule này:</Label>
                           <div className="grid grid-cols-2 gap-2 p-4 border rounded-lg bg-gray-50">
-                            {Array.from({ length: numScenes }, (_, i) => (
+                            {scenes.map((scene, i) => (
                               <div
                                 key={i}
                                 className="flex items-center space-x-2"
@@ -626,27 +697,11 @@ export default function Generator() {
                                     );
                                   }}
                                 />
-                                <Label>Scene {i + 1}</Label>
+                                <Label>{scene.name}</Label>
                               </div>
                             ))}
                           </div>
                         </div>
-
-                        {/* <div>
-                          <Label>Số lượng Scene của Schedule:</Label>
-                          <Input
-                            type="number"
-                            min="1"
-                            value={schedule.sceneAmount}
-                            onChange={(e) =>
-                              handleScheduleChange(
-                                scheduleIndex,
-                                "sceneAmount",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div> */}
 
                         <Alert>
                           <Terminal className="h-4 w-4" />
@@ -662,26 +717,6 @@ export default function Generator() {
                             chọn những scene tương ứng cho Schedule này là được.
                           </AlertDescription>
                         </Alert>
-
-                        {/* {schedule.sceneGroup.map((group, groupIndex) => (
-                          <div key={groupIndex}>
-                            <Label className="font-bold">
-                              Scene {groupIndex + 1}:
-                            </Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={group}
-                              onChange={(e) =>
-                                handleSceneGroupChange(
-                                  scheduleIndex,
-                                  groupIndex,
-                                  e.target.value
-                                )
-                              }
-                            />
-                          </div>
-                        ))} */}
 
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -768,7 +803,7 @@ export default function Generator() {
 
         {/* Right Column - Generated Code */}
         <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]">
-          <Card className="shadow-md flex flex-col h-full">
+          <Card className="shadow-sm flex flex-col h-full">
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>Gửi anh Hoài An</CardTitle>
