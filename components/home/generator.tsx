@@ -19,6 +19,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { CodeBlock } from "@/components/ui/code-block";
 import OverviewDialog from "@/components/home/drag-dialog";
+import { cloneDeep } from "lodash";
 
 interface Light {
   group: number;
@@ -114,7 +115,7 @@ export default function Generator() {
   };
 
   const handleCopyScene = (sceneIndex: number) => {
-    const sceneToCopy = scenes[sceneIndex];
+    const sceneToCopy = cloneDeep(scenes[sceneIndex]);
     const newScene = {
       ...sceneToCopy,
       name: `${sceneToCopy.name} (Copy)`,
@@ -128,7 +129,7 @@ export default function Generator() {
   };
 
   const handleCopySchedule = (scheduleIndex: number) => {
-    const scheduleToCopy = schedules[scheduleIndex];
+    const scheduleToCopy = cloneDeep(schedules[scheduleIndex]);
     const newSchedule = {
       ...scheduleToCopy,
       name: `${scheduleToCopy.name} (Copy)`,
