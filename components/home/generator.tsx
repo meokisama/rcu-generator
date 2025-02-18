@@ -18,6 +18,7 @@ import { Terminal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { CodeBlock } from "@/components/ui/code-block";
+import OverviewDialog from "@/components/home/drag-dialog";
 
 interface Light {
   group: number;
@@ -837,9 +838,15 @@ export default function Generator() {
         <div className="lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)]">
           <Card className="shadow-sm flex flex-col h-full">
             <CardHeader>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center gap-4 flex-col lg:flex-row">
                 <CardTitle>Gửi anh Hoài An</CardTitle>
                 <div className="flex gap-2">
+                  <OverviewDialog
+                    scenes={scenes}
+                    setScenes={setScenes}
+                    schedules={schedules}
+                    setSchedules={setSchedules}
+                  />
                   <Button
                     variant="outline"
                     size="icon"
