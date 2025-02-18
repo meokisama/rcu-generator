@@ -10,12 +10,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Copy, Download, Plus, Trash2, SquarePen } from "lucide-react";
+import { Copy, Download, Plus, Trash2, PenLine } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Terminal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { toast } from "sonner";
 
 interface Light {
   group: number;
@@ -118,6 +119,10 @@ export default function Generator() {
     };
     setScenes([...scenes, newScene]);
     setNumScenes(scenes.length + 1);
+    toast.success("Sao chép scene thành công!", {
+      description: "Scene được sao chép sẽ nằm ở cuối danh sách.",
+      duration: 6000,
+    });
   };
 
   const handleCopySchedule = (scheduleIndex: number) => {
@@ -128,6 +133,10 @@ export default function Generator() {
     };
     setSchedules([...schedules, newSchedule]);
     setNumSchedules(schedules.length + 1);
+    toast.success("Sao chép schedule thành công!", {
+      description: "Schedule được sao chép sẽ nằm ở cuối danh sách.",
+      duration: 6000,
+    });
   };
 
   const handleAmountChange = (sceneIndex: number, value: string) => {
@@ -316,6 +325,10 @@ export default function Generator() {
         isSequential: false,
       },
     ]);
+    toast.success("Thêm scene mới thành công!", {
+      description: "Scene được tạo sẽ nằm ở cuối danh sách.",
+      duration: 6000,
+    });
   };
 
   const handleAddSchedule = () => {
@@ -338,6 +351,10 @@ export default function Generator() {
         minute: 0,
       },
     ]);
+    toast.success("Thêm schedule mới thành công!", {
+      description: "Schedule được tạo sẽ nằm ở cuối danh sách.",
+      duration: 6000,
+    });
   };
 
   const handleDownload = () => {
@@ -355,6 +372,12 @@ export default function Generator() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+
+    toast.success("Tải xuống thành công!", {
+      description:
+        "Code đã được tải xuống, đọc phần chú ý và gửi file này cho anh Hoài An.",
+      duration: 8000,
+    });
   };
 
   // Delete handlers
@@ -378,6 +401,10 @@ export default function Generator() {
         };
       });
       setSchedules(newSchedules);
+      toast.success("Đã xóa scene!", {
+        description: "Scene đã được xóa khỏi danh sách.",
+        duration: 6000,
+      });
     }
   };
 
@@ -388,6 +415,10 @@ export default function Generator() {
       );
       setSchedules(newSchedules);
       setNumSchedules((prev) => prev - 1);
+      toast.success("Đã xóa schedule!", {
+        description: "Schedule đã được xóa khỏi danh sách.",
+        duration: 6000,
+      });
     }
   };
 
@@ -397,9 +428,9 @@ export default function Generator() {
 
   return (
     <div className="p-4 lg:px-10">
-      <div className="lg:grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Left Column - Input Form */}
-        <div className="space-y-4 mb-4">
+        <div className="space-y-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="w-full">
               <TabsTrigger value="scene" className="flex-1">
@@ -430,9 +461,9 @@ export default function Generator() {
                         key={sceneIndex}
                         className="border p-4 rounded-lg shadow-md relative"
                       >
-                        <div className="flex justify-between items-center mb-4">
-                          <div className="flex-1 mr-6 lg:mr-12 mb-2 relative">
-                            <SquarePen className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                        <div className="flex justify-between items-center mb-6">
+                          <div className="flex-1 mr-6 lg:mr-12 relative">
+                            <PenLine className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                             <Input
                               value={scene.name}
                               onChange={(e) =>
@@ -621,9 +652,9 @@ export default function Generator() {
                         key={scheduleIndex}
                         className="border p-4 rounded-lg space-y-4 shadow-md relative"
                       >
-                        <div className="flex justify-between items-center mb-4">
-                          <div className="flex-1 mr-6 lg:mr-12 mb-2 relative">
-                            <SquarePen className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                        <div className="flex justify-between items-center mb-6">
+                          <div className="flex-1 mr-6 lg:mr-12 relative">
+                            <PenLine className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                             <Input
                               value={schedule.name}
                               onChange={(e) =>
