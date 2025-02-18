@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Terminal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
+import { CodeBlock } from "@/components/ui/code-block";
 
 interface Light {
   group: number;
@@ -842,7 +843,14 @@ export default function Generator() {
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => navigator.clipboard.writeText(generatedCode)}
+                    onClick={() => {
+                      navigator.clipboard.writeText(generatedCode);
+                      toast.success("Đã sao chép!", {
+                        description:
+                          "Code của phần này đã được sao chép vào clipboard.",
+                        duration: 6000,
+                      });
+                    }}
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
@@ -857,8 +865,13 @@ export default function Generator() {
               </div>
             </CardHeader>
             <CardContent className="flex-1 overflow-auto">
-              <div className="h-full p-4 bg-gray-100 rounded-lg">
-                <pre className="p-4 h-full overflow-auto">{generatedCode}</pre>
+              <div className="h-full p-4 pl-0 bg-slate-900 rounded-lg">
+                {/* <pre className="p-4 h-full overflow-auto">{generatedCode}</pre> */}
+                <CodeBlock
+                  language="js"
+                  code={generatedCode}
+                  showCopyButton={false}
+                />
               </div>
             </CardContent>
             <CardFooter>

@@ -6,7 +6,8 @@ import { IconCheck, IconCopy } from "@tabler/icons-react";
 
 type CodeBlockProps = {
   language: string;
-  filename: string;
+  filename?: string;
+  showCopyButton?: boolean;
   highlightLines?: number[];
 } & (
   | {
@@ -26,10 +27,11 @@ type CodeBlockProps = {
 
 export const CodeBlock = ({
   language,
-  filename,
+  filename = "",
   code,
   highlightLines = [],
   tabs = [],
+  showCopyButton = true,
 }: CodeBlockProps) => {
   const [copied, setCopied] = React.useState(false);
   const [activeTab, setActiveTab] = React.useState(0);
@@ -54,37 +56,41 @@ export const CodeBlock = ({
     : highlightLines;
 
   return (
-    <div className="relative w-full rounded-lg bg-slate-900 p-4 font-mono text-sm h-full">
-      <div className="flex flex-col gap-2 mb-2">
-        {tabsExist && (
-          <div className="flex  overflow-x-auto">
-            {tabs.map((tab, index) => (
-              <button
-                key={index}
-                onClick={() => setActiveTab(index)}
-                className={`px-3 !py-2 text-xs transition-colors font-sans ${
-                  activeTab === index
-                    ? "text-white"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                {tab.name}
-              </button>
-            ))}
-          </div>
-        )}
-        {!tabsExist && filename && (
-          <div className="flex justify-between items-center py-2">
-            <div className="text-xs text-zinc-400">{filename}</div>
-            <button
-              onClick={copyToClipboard}
-              className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors font-sans"
-            >
-              {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
-            </button>
-          </div>
-        )}
-      </div>
+    <div className="relative w-full rounded-lg bg-slate-900 p-4 pt-1 font-mono text-sm overflow-y-auto h-full">
+      {filename && (
+        <div className="flex flex-col gap-2 mb-2">
+          {tabsExist && (
+            <div className="flex  overflow-x-auto">
+              {tabs.map((tab, index) => (
+                <button
+                  key={index}
+                  onClick={() => setActiveTab(index)}
+                  className={`px-3 !py-2 text-xs transition-colors font-sans ${
+                    activeTab === index
+                      ? "text-white"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {tab.name}
+                </button>
+              ))}
+            </div>
+          )}
+          {!tabsExist && filename && (
+            <div className="flex justify-between items-center py-2">
+              <div className="text-xs text-zinc-400">{filename}</div>
+              {showCopyButton && (
+                <button
+                  onClick={copyToClipboard}
+                  className="flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors font-sans"
+                >
+                  {copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
       <div className="overflow-y-auto">
         <SyntaxHighlighter
           language={activeLanguage}
