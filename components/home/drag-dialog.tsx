@@ -204,35 +204,68 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
   };
 
   const renderSceneItem = (scene: Scene, index: number): React.ReactNode => (
-    <div>
+    <div className="relative">
       <h3 className="font-bold text-red-600">{scene.name}</h3>
+      <p className="text-gray-400 absolute right-0 top-0"># {index + 1}</p>
       <div className="mt-2 text-sm text-gray-600">
-        <p className="text-gray-400">Scene {index + 1}</p>
-        <p>Số line đèn: {scene.amount}</p>
         <p>
-          Chế độ:{" "}
-          {scene.isSequential ? "Group đèn liên tục" : "Group đèn rời rạc"}
+          Gồm <span className="font-semibold">{scene.amount}</span> line đèn.{" "}
+          {scene.isSequential ? (
+            <span>
+              Với các group từ{" "}
+              <span className="bg-slate-400 px-1 text-gray-100 rounded-sm">
+                {scene.startGroup}
+              </span>{" "}
+              đến{" "}
+              <span className="bg-slate-400 px-1 text-gray-100 rounded-sm">
+                {scene.startGroup && scene.startGroup + scene.amount}
+              </span>
+            </span>
+          ) : (
+            <span>
+              Với các group gồm{" "}
+              {scene.lights.map((light, index) => (
+                <React.Fragment key={index}>
+                  <span className="bg-slate-400 px-1 text-gray-100 rounded-sm">
+                    {light.group}
+                  </span>
+                  {index < scene.lights.length - 1 && ", "}
+                </React.Fragment>
+              ))}
+            </span>
+          )}
         </p>
-        {scene.isSequential ? (
-          <p>Group bắt đầu: {scene.startGroup}</p>
-        ) : (
-          <p>Groups: {scene.lights.map((light) => light.group).join(", ")}</p>
-        )}
       </div>
     </div>
   );
 
-  const renderScheduleItem = (schedule: Schedule): React.ReactNode => (
-    <div>
+  const renderScheduleItem = (
+    schedule: Schedule,
+    index: number
+  ): React.ReactNode => (
+    <div className="relative">
+      <p className="text-gray-400 absolute right-0 top-0"># {index + 1}</p>
       <h3 className="font-bold text-red-600">{schedule.name}</h3>
       <div className="mt-2 text-sm text-gray-600">
-        <p>Trạng thái: {schedule.enable ? "Kích hoạt" : "Vô hiệu"}</p>
-        <p>Thời gian: {formatTime(schedule.hour, schedule.minute)}</p>
+        {/* <p>Trạng thái: {schedule.enable ? "Kích hoạt" : "Vô hiệu"}</p> */}
         <p>
-          Scenes:{" "}
-          {schedule.sceneGroup.map((id) => getSceneNameById(id)).join(", ")}
+          - Kích hoạt vào{" "}
+          <span className="font-bold">
+            {formatTime(schedule.hour, schedule.minute)}
+          </span>{" "}
+          các ngày <span className="font-bold">{getActiveDays(schedule)}</span>
         </p>
-        <p>Ngày trong tuần: {getActiveDays(schedule)}</p>
+        <p>
+          - Gồm các scene:{" "}
+          {schedule.sceneGroup.map((id, index) => (
+            <React.Fragment key={id}>
+              <span className="bg-slate-400 px-1 text-gray-100 rounded-sm">
+                {getSceneNameById(id)}
+              </span>
+              {index < schedule.sceneGroup.length - 1 && ", "}
+            </React.Fragment>
+          ))}
+        </p>
       </div>
     </div>
   );
@@ -247,7 +280,9 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
       </DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>Tổng quan Scene & Schedule</DialogTitle>
+          <DialogTitle className="text-center">
+            Scene & Schedule đã tạo
+          </DialogTitle>
         </DialogHeader>
 
         <div className="mt-4">
@@ -295,12 +330,12 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
                   )}
                   strategy={verticalListSortingStrategy}
                 >
-                  {schedules.map((schedule) => (
+                  {schedules.map((schedule, index) => (
                     <SortableItem
                       key={`schedules-${schedule.name}`}
                       id={`schedules-${schedule.name}`}
                     >
-                      {renderScheduleItem(schedule)}
+                      {renderScheduleItem(schedule, index)}
                     </SortableItem>
                   ))}
                 </SortableContext>

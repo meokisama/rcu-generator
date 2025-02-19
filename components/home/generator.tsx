@@ -204,6 +204,7 @@ export default function Generator() {
       .fill(null)
       .map((_, i) => ({
         ...(schedules[i] || {
+          name: `Schedule ${i + 1}`,
           enable: true,
           sceneAmount: 1,
           sceneGroup: [1],
