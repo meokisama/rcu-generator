@@ -20,10 +20,12 @@ import { toast } from "sonner";
 import { CodeBlock } from "@/components/ui/code-block";
 import OverviewDialog from "@/components/home/drag-dialog";
 import { cloneDeep } from "lodash";
+import LightList from "@/components/home/light-list";
 
 interface Light {
   group: number;
   value: number;
+  name: string;
 }
 
 interface Scene {
@@ -57,7 +59,7 @@ export default function Generator() {
     {
       name: "Scene 1",
       amount: 1,
-      lights: [{ group: 1, value: 100 }],
+      lights: [{ group: 1, value: 100, name: "Đèn 1" }],
       isSequential: false,
     },
   ]);
@@ -151,9 +153,11 @@ export default function Generator() {
     } else {
       if (amount > newScenes[sceneIndex].lights.length) {
         while (newScenes[sceneIndex].lights.length < amount) {
+          const newIndex = newScenes[sceneIndex].lights.length + 1;
           newScenes[sceneIndex].lights.push({
             group: 1,
             value: 100,
+            name: `Đèn ${newIndex}`,
           });
         }
       } else {
@@ -171,7 +175,7 @@ export default function Generator() {
   const handleLightChange = (
     sceneIndex: number,
     lightIndex: number,
-    field: keyof Light,
+    field: "group" | "value",
     value: string
   ) => {
     const newScenes = [...scenes];
@@ -184,7 +188,7 @@ export default function Generator() {
     newScenes[sceneIndex].isSequential = !newScenes[sceneIndex].isSequential;
     if (newScenes[sceneIndex].isSequential) {
       newScenes[sceneIndex].startGroup = 1;
-      newScenes[sceneIndex].lights = [{ group: 1, value: 100 }];
+      newScenes[sceneIndex].lights = [{ group: 1, value: 100, name: "Đèn 1" }];
     }
     setScenes(newScenes);
   };
@@ -325,7 +329,7 @@ export default function Generator() {
       {
         name: `Scene ${prev.length + 1}`,
         amount: 1,
-        lights: [{ group: 1, value: 100 }],
+        lights: [{ group: 1, value: 100, name: "Đèn 1" }],
         isSequential: false,
       },
     ]);
@@ -426,6 +430,50 @@ export default function Generator() {
     }
   };
 
+  const handleDeleteLight = (sceneIndex: number, lightIndex: number) => {
+    const newScenes = [...scenes];
+    if (newScenes[sceneIndex].lights.length > 1) {
+      newScenes[sceneIndex].lights = newScenes[sceneIndex].lights.filter(
+        (_, index) => index !== lightIndex
+      );
+      newScenes[sceneIndex].amount = newScenes[sceneIndex].lights.length;
+      setScenes(newScenes);
+      toast.success("Đã xóa line đèn!", {
+        description: "Line đèn đã được xóa khỏi danh sách.",
+        duration: 6000,
+      });
+    }
+  };
+
+  // Add a new handler for light name changes
+  const handleLightNameChange = (
+    sceneIndex: number,
+    lightIndex: number,
+    newName: string
+  ) => {
+    const newScenes = [...scenes];
+    newScenes[sceneIndex].lights[lightIndex].name = newName;
+    setScenes(newScenes);
+  };
+
+  const handleAddLight = (sceneIndex: number) => {
+    const newScenes = [...scenes];
+    const newLightIndex = newScenes[sceneIndex].lights.length + 1;
+
+    newScenes[sceneIndex].lights.push({
+      group: 1,
+      value: 100,
+      name: `Đèn ${newLightIndex}`,
+    });
+    newScenes[sceneIndex].amount = newScenes[sceneIndex].lights.length;
+
+    setScenes(newScenes);
+    toast.success("Thêm line đèn thành công!", {
+      description: "Line đèn mới đã được thêm vào danh sách.",
+      duration: 6000,
+    });
+  };
+
   useEffect(() => {
     setGeneratedCode(generateCode());
   }, [scenes, schedules, activeTab, generateCode]);
@@ -487,6 +535,14 @@ export default function Generator() {
                               />
                             </div>
                             <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => handleCopyScene(sceneIndex)}
+                                className="shadow-sm"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
                               {scenes.length > 1 && (
                                 <Button
                                   variant="destructive"
@@ -497,14 +553,6 @@ export default function Generator() {
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               )}
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => handleCopyScene(sceneIndex)}
-                                className="shadow-sm"
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2 mb-4">
@@ -536,98 +584,16 @@ export default function Generator() {
                             </AlertDescription>
                           </Alert>
 
-                          <div className="space-y-4">
-                            <div>
-                              <Label>Số line đèn:</Label>
-                              <Input
-                                type="number"
-                                min="1"
-                                value={scene.amount}
-                                onChange={(e) =>
-                                  handleAmountChange(sceneIndex, e.target.value)
-                                }
-                              />
-                            </div>
-
-                            {scene.isSequential ? (
-                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                <div>
-                                  <Label>Group bắt đầu:</Label>
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    value={scene.startGroup}
-                                    onChange={(e) =>
-                                      handleStartGroupChange(
-                                        sceneIndex,
-                                        e.target.value
-                                      )
-                                    }
-                                  />
-                                </div>
-                                <div>
-                                  <Label>Độ sáng các đèn (%):</Label>
-                                  <Input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    value={scene.lights[0].value}
-                                    onChange={(e) =>
-                                      handleLightChange(
-                                        sceneIndex,
-                                        0,
-                                        "value",
-                                        e.target.value
-                                      )
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            ) : (
-                              scene.lights.map((light, lightIndex) => (
-                                <div
-                                  key={lightIndex}
-                                  className="grid grid-cols-1 lg:grid-cols-2 gap-4"
-                                >
-                                  <div>
-                                    <Label>Group Đèn {lightIndex + 1}:</Label>
-                                    <Input
-                                      type="number"
-                                      min="1"
-                                      value={light.group}
-                                      onChange={(e) =>
-                                        handleLightChange(
-                                          sceneIndex,
-                                          lightIndex,
-                                          "group",
-                                          e.target.value
-                                        )
-                                      }
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label>
-                                      Độ sáng (%) Đèn {lightIndex + 1}:
-                                    </Label>
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      max="100"
-                                      value={light.value}
-                                      onChange={(e) =>
-                                        handleLightChange(
-                                          sceneIndex,
-                                          lightIndex,
-                                          "value",
-                                          e.target.value
-                                        )
-                                      }
-                                    />
-                                  </div>
-                                </div>
-                              ))
-                            )}
-                          </div>
+                          <LightList
+                            scene={scene}
+                            sceneIndex={sceneIndex}
+                            handleAmountChange={handleAmountChange}
+                            handleStartGroupChange={handleStartGroupChange}
+                            handleLightChange={handleLightChange}
+                            handleLightNameChange={handleLightNameChange}
+                            handleDeleteLight={handleDeleteLight}
+                            handleAddLight={handleAddLight}
+                          />
                         </div>
                       </div>
                     ))}

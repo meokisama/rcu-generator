@@ -28,6 +28,7 @@ import { CSS } from "@dnd-kit/utilities";
 interface Light {
   group: number;
   value: number;
+  name: string;
 }
 
 interface Scene {
