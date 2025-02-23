@@ -448,7 +448,7 @@ export default function Generator() {
             <TabsContent value="scene">
               <Card>
                 <CardContent className="pt-6">
-                  <div className="space-y-4">
+                  <div className="space-y-0">
                     <div>
                       <Label>Số lượng Scene cần tạo:</Label>
                       <Input
@@ -461,155 +461,121 @@ export default function Generator() {
                     </div>
 
                     {scenes.map((scene, sceneIndex) => (
-                      <div
-                        key={sceneIndex}
-                        className="border p-4 rounded-lg shadow-md relative"
-                      >
-                        <div className="flex justify-between items-center mb-6">
-                          <div className="flex-1 mr-6 lg:mr-12 relative">
-                            <PenLine className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                            <Input
-                              value={scene.name}
-                              onChange={(e) =>
-                                handleSceneNameChange(
-                                  sceneIndex,
-                                  e.target.value
-                                )
-                              }
-                              className="font-bold text-red-600 lg:text-lg shadow-sm pl-8"
-                            />
+                      <div key={sceneIndex}>
+                        {sceneIndex >= 0 && (
+                          <div className="flex flex-col items-center gap-2 pointer-events-none select-none">
+                            <div className="w-px h-6 bg-gray-200" />
+                            <div className="px-4 py-1 rounded-full bg-gray-100 text-gray-500 text-sm font-medium">
+                              Scene #{sceneIndex + 1}
+                            </div>
+                            <div className="w-px h-6 bg-gray-200" />
                           </div>
-                          <div className="flex gap-2">
-                            {scenes.length > 1 && (
+                        )}
+                        <div className="border p-4 rounded-lg shadow-sm relative bg-[#f3f4f641]">
+                          <div className="flex justify-between items-center mb-6">
+                            <div className="flex-1 mr-6 lg:mr-12 relative">
+                              <PenLine className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                              <Input
+                                value={scene.name}
+                                onChange={(e) =>
+                                  handleSceneNameChange(
+                                    sceneIndex,
+                                    e.target.value
+                                  )
+                                }
+                                className="font-bold text-red-600 lg:text-lg shadow-sm pl-8"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              {scenes.length > 1 && (
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  onClick={() => handleDeleteScene(sceneIndex)}
+                                  className="shadow-sm"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
-                                variant="destructive"
+                                variant="outline"
                                 size="icon"
-                                onClick={() => handleDeleteScene(sceneIndex)}
+                                onClick={() => handleCopyScene(sceneIndex)}
                                 className="shadow-sm"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Copy className="h-4 w-4" />
                               </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => handleCopyScene(sceneIndex)}
-                              className="shadow-sm"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex items-center space-x-2 mb-4">
-                          <Switch
-                            checked={scene.isSequential}
-                            onCheckedChange={() =>
-                              handleSequentialToggle(sceneIndex)
-                            }
-                          />
-                          <Label>Group đèn liên tục</Label>
-                        </div>
-
-                        <Alert className="mb-4">
-                          <Terminal className="h-4 w-4" />
-                          <AlertTitle className="font-bold">
-                            Các anh chú ý!
-                          </AlertTitle>
-                          <AlertDescription>
-                            Nếu scene cần tạo có line đèn là các địa chỉ group
-                            liên tiếp nhau một mạch, ví dụ từ group 1 → group
-                            10, thì bật chế độ{" "}
-                            <strong className="text-red-700">
-                              Group đèn liên tục
-                            </strong>{" "}
-                            này lên. Và, độ sáng các đèn này phải đồng nhất bằng
-                            nhau thì mới được, còn các đèn độ sáng khác nhau thì
-                            hãy tắt cái này và điền thủ công bên dưới.
-                          </AlertDescription>
-                        </Alert>
-
-                        <div className="space-y-4">
-                          <div>
-                            <Label>Số line đèn:</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              value={scene.amount}
-                              onChange={(e) =>
-                                handleAmountChange(sceneIndex, e.target.value)
+                          <div className="flex items-center space-x-2 mb-4">
+                            <Switch
+                              checked={scene.isSequential}
+                              onCheckedChange={() =>
+                                handleSequentialToggle(sceneIndex)
                               }
                             />
+                            <Label>Group đèn liên tục</Label>
                           </div>
 
-                          {scene.isSequential ? (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                              <div>
-                                <Label>Group bắt đầu:</Label>
-                                <Input
-                                  type="number"
-                                  min="1"
-                                  value={scene.startGroup}
-                                  onChange={(e) =>
-                                    handleStartGroupChange(
-                                      sceneIndex,
-                                      e.target.value
-                                    )
-                                  }
-                                />
-                              </div>
-                              <div>
-                                <Label>Độ sáng các đèn (%):</Label>
-                                <Input
-                                  type="number"
-                                  min="0"
-                                  max="100"
-                                  value={scene.lights[0].value}
-                                  onChange={(e) =>
-                                    handleLightChange(
-                                      sceneIndex,
-                                      0,
-                                      "value",
-                                      e.target.value
-                                    )
-                                  }
-                                />
-                              </div>
+                          <Alert className="mb-4">
+                            <Terminal className="h-4 w-4" />
+                            <AlertTitle className="font-bold">
+                              Các anh chú ý!
+                            </AlertTitle>
+                            <AlertDescription>
+                              Nếu scene cần tạo có line đèn là các địa chỉ group
+                              liên tiếp nhau một mạch, ví dụ từ group 1 → group
+                              10, thì bật chế độ{" "}
+                              <strong className="text-red-700">
+                                Group đèn liên tục
+                              </strong>{" "}
+                              này lên. Và, độ sáng các đèn này phải đồng nhất
+                              bằng nhau thì mới được, còn các đèn độ sáng khác
+                              nhau thì hãy tắt cái này và điền thủ công bên
+                              dưới.
+                            </AlertDescription>
+                          </Alert>
+
+                          <div className="space-y-4">
+                            <div>
+                              <Label>Số line đèn:</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                value={scene.amount}
+                                onChange={(e) =>
+                                  handleAmountChange(sceneIndex, e.target.value)
+                                }
+                              />
                             </div>
-                          ) : (
-                            scene.lights.map((light, lightIndex) => (
-                              <div
-                                key={lightIndex}
-                                className="grid grid-cols-1 lg:grid-cols-2 gap-4"
-                              >
+
+                            {scene.isSequential ? (
+                              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                                 <div>
-                                  <Label>Group Đèn {lightIndex + 1}:</Label>
+                                  <Label>Group bắt đầu:</Label>
                                   <Input
                                     type="number"
                                     min="1"
-                                    value={light.group}
+                                    value={scene.startGroup}
                                     onChange={(e) =>
-                                      handleLightChange(
+                                      handleStartGroupChange(
                                         sceneIndex,
-                                        lightIndex,
-                                        "group",
                                         e.target.value
                                       )
                                     }
                                   />
                                 </div>
                                 <div>
-                                  <Label>
-                                    Độ sáng (%) Đèn {lightIndex + 1}:
-                                  </Label>
+                                  <Label>Độ sáng các đèn (%):</Label>
                                   <Input
                                     type="number"
                                     min="0"
                                     max="100"
-                                    value={light.value}
+                                    value={scene.lights[0].value}
                                     onChange={(e) =>
                                       handleLightChange(
                                         sceneIndex,
-                                        lightIndex,
+                                        0,
                                         "value",
                                         e.target.value
                                       )
@@ -617,8 +583,51 @@ export default function Generator() {
                                   />
                                 </div>
                               </div>
-                            ))
-                          )}
+                            ) : (
+                              scene.lights.map((light, lightIndex) => (
+                                <div
+                                  key={lightIndex}
+                                  className="grid grid-cols-1 lg:grid-cols-2 gap-4"
+                                >
+                                  <div>
+                                    <Label>Group Đèn {lightIndex + 1}:</Label>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      value={light.group}
+                                      onChange={(e) =>
+                                        handleLightChange(
+                                          sceneIndex,
+                                          lightIndex,
+                                          "group",
+                                          e.target.value
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label>
+                                      Độ sáng (%) Đèn {lightIndex + 1}:
+                                    </Label>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      max="100"
+                                      value={light.value}
+                                      onChange={(e) =>
+                                        handleLightChange(
+                                          sceneIndex,
+                                          lightIndex,
+                                          "value",
+                                          e.target.value
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                </div>
+                              ))
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -639,7 +648,7 @@ export default function Generator() {
             <TabsContent value="schedule">
               <Card>
                 <CardContent className="pt-6">
-                  <div className="space-y-4">
+                  <div className="space-y-0">
                     <div>
                       <Label>Số lượng Schedule cần tạo:</Label>
                       <Input
@@ -652,171 +661,184 @@ export default function Generator() {
                     </div>
 
                     {schedules.map((schedule, scheduleIndex) => (
-                      <div
-                        key={scheduleIndex}
-                        className="border p-4 rounded-lg space-y-4 shadow-md relative"
-                      >
-                        <div className="flex justify-between items-center mb-6">
-                          <div className="flex-1 mr-6 lg:mr-12 relative">
-                            <PenLine className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
-                            <Input
-                              value={schedule.name}
-                              onChange={(e) =>
-                                handleScheduleNameChange(
-                                  scheduleIndex,
-                                  e.target.value
-                                )
-                              }
-                              className="font-bold text-red-600 lg:text-lg shadow-sm pl-8"
-                            />
+                      <div key={scheduleIndex}>
+                        {scheduleIndex >= 0 && (
+                          <div className="flex flex-col items-center gap-2 pointer-events-none select-none">
+                            <div className="w-px h-6 bg-gray-200" />
+                            <div className="px-4 py-1 rounded-full bg-gray-100 text-gray-500 text-sm font-medium">
+                              Schedule #{scheduleIndex + 1}
+                            </div>
+                            <div className="w-px h-6 bg-gray-200" />
                           </div>
-                          <div className="flex gap-2">
-                            {schedules.length > 1 && (
+                        )}
+                        <div className="border p-4 rounded-lg space-y-4 shadow-sm relative bg-[#f3f4f641]">
+                          <div className="flex justify-between items-center mb-6">
+                            <div className="flex-1 mr-6 lg:mr-12 relative">
+                              <PenLine className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                              <Input
+                                value={schedule.name}
+                                onChange={(e) =>
+                                  handleScheduleNameChange(
+                                    scheduleIndex,
+                                    e.target.value
+                                  )
+                                }
+                                className="font-bold text-red-600 lg:text-lg shadow-sm pl-8"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              {schedules.length > 1 && (
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  onClick={() =>
+                                    handleDeleteSchedule(scheduleIndex)
+                                  }
+                                  className="shadow-sm"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                               <Button
-                                variant="destructive"
+                                variant="outline"
                                 size="icon"
                                 onClick={() =>
-                                  handleDeleteSchedule(scheduleIndex)
+                                  handleCopySchedule(scheduleIndex)
                                 }
                                 className="shadow-sm"
                               >
-                                <Trash2 className="h-4 w-4" />
+                                <Copy className="h-4 w-4" />
                               </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              onClick={() => handleCopySchedule(scheduleIndex)}
-                              className="shadow-sm"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </Button>
+                            </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            checked={schedule.enable}
-                            onCheckedChange={(checked) =>
-                              handleScheduleChange(
-                                scheduleIndex,
-                                "enable",
-                                checked
-                              )
-                            }
-                          />
-                          <Label>Kích hoạt</Label>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Chọn các Scene cho Schedule này:</Label>
-                          <div className="grid grid-cols-2 gap-2 p-4 border rounded-lg bg-gray-50">
-                            {scenes.map((scene, i) => (
-                              <div
-                                key={i}
-                                className="flex items-center space-x-2"
-                              >
-                                <Checkbox
-                                  checked={schedule.sceneGroup.includes(i + 1)}
-                                  onCheckedChange={(checked) => {
-                                    const newSelection = checked
-                                      ? [...schedule.sceneGroup, i + 1].sort(
-                                          (a, b) => a - b
-                                        )
-                                      : schedule.sceneGroup.filter(
-                                          (num) => num !== i + 1
-                                        );
-                                    handleSceneSelection(
-                                      scheduleIndex,
-                                      newSelection
-                                    );
-                                  }}
-                                />
-                                <Label>{scene.name}</Label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        <Alert>
-                          <Terminal className="h-4 w-4" />
-                          <AlertTitle className="font-bold">
-                            Các anh chú ý!
-                          </AlertTitle>
-                          <AlertDescription>
-                            Ở phần chọn Scene này sẽ liệt kê{" "}
-                            <strong className="text-red-700">
-                              tất cả các scene đã được tạo
-                            </strong>{" "}
-                            ở tab Ngữ cảnh (Scene) bên trên, và giờ chỉ cần tick
-                            chọn những scene tương ứng cho Schedule này là được.
-                          </AlertDescription>
-                        </Alert>
-
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label>Giờ kích hoạt:</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              max="23"
-                              value={schedule.hour}
-                              onChange={(e) =>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={schedule.enable}
+                              onCheckedChange={(checked) =>
                                 handleScheduleChange(
                                   scheduleIndex,
-                                  "hour",
-                                  parseInt(e.target.value) || 0
+                                  "enable",
+                                  checked
                                 )
                               }
                             />
+                            <Label>Kích hoạt</Label>
                           </div>
-                          <div>
-                            <Label>Phút (nếu có):</Label>
-                            <Input
-                              type="number"
-                              min="0"
-                              max="59"
-                              value={schedule.minute}
-                              onChange={(e) =>
-                                handleScheduleChange(
-                                  scheduleIndex,
-                                  "minute",
-                                  parseInt(e.target.value) || 0
-                                )
-                              }
-                            />
-                          </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          {[
-                            "monday",
-                            "tuesday",
-                            "wednesday",
-                            "thursday",
-                            "friday",
-                            "saturday",
-                            "sunday",
-                          ].map((day) => (
-                            <div
-                              key={day}
-                              className="flex items-center space-x-2"
-                            >
-                              <Checkbox
-                                checked={
-                                  schedule[day as keyof Schedule] as boolean
-                                }
-                                onCheckedChange={(checked) =>
+                          <div className="space-y-2">
+                            <Label>Chọn các Scene cho Schedule này:</Label>
+                            <div className="grid grid-cols-2 gap-2 p-4 border rounded-lg bg-gray-50">
+                              {scenes.map((scene, i) => (
+                                <div
+                                  key={i}
+                                  className="flex items-center space-x-2"
+                                >
+                                  <Checkbox
+                                    checked={schedule.sceneGroup.includes(
+                                      i + 1
+                                    )}
+                                    onCheckedChange={(checked) => {
+                                      const newSelection = checked
+                                        ? [...schedule.sceneGroup, i + 1].sort(
+                                            (a, b) => a - b
+                                          )
+                                        : schedule.sceneGroup.filter(
+                                            (num) => num !== i + 1
+                                          );
+                                      handleSceneSelection(
+                                        scheduleIndex,
+                                        newSelection
+                                      );
+                                    }}
+                                  />
+                                  <Label>{scene.name}</Label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <Alert>
+                            <Terminal className="h-4 w-4" />
+                            <AlertTitle className="font-bold">
+                              Các anh chú ý!
+                            </AlertTitle>
+                            <AlertDescription>
+                              Ở phần chọn Scene này sẽ liệt kê{" "}
+                              <strong className="text-red-700">
+                                tất cả các scene đã được tạo
+                              </strong>{" "}
+                              ở tab Ngữ cảnh (Scene) bên trên, và giờ chỉ cần
+                              tick chọn những scene tương ứng cho Schedule này
+                              là được.
+                            </AlertDescription>
+                          </Alert>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label>Giờ kích hoạt:</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="23"
+                                value={schedule.hour}
+                                onChange={(e) =>
                                   handleScheduleChange(
                                     scheduleIndex,
-                                    day as keyof Schedule,
-                                    checked
+                                    "hour",
+                                    parseInt(e.target.value) || 0
                                   )
                                 }
                               />
-                              <Label className="capitalize">{day}</Label>
                             </div>
-                          ))}
+                            <div>
+                              <Label>Phút (nếu có):</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="59"
+                                value={schedule.minute}
+                                onChange={(e) =>
+                                  handleScheduleChange(
+                                    scheduleIndex,
+                                    "minute",
+                                    parseInt(e.target.value) || 0
+                                  )
+                                }
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              "monday",
+                              "tuesday",
+                              "wednesday",
+                              "thursday",
+                              "friday",
+                              "saturday",
+                              "sunday",
+                            ].map((day) => (
+                              <div
+                                key={day}
+                                className="flex items-center space-x-2"
+                              >
+                                <Checkbox
+                                  checked={
+                                    schedule[day as keyof Schedule] as boolean
+                                  }
+                                  onCheckedChange={(checked) =>
+                                    handleScheduleChange(
+                                      scheduleIndex,
+                                      day as keyof Schedule,
+                                      checked
+                                    )
+                                  }
+                                />
+                                <Label className="capitalize">{day}</Label>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     ))}

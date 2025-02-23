@@ -207,34 +207,34 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
     <div className="relative">
       <h3 className="font-bold text-red-600">{scene.name}</h3>
       <p className="text-gray-400 absolute right-0 top-0"># {index + 1}</p>
-      <div className="mt-2 text-sm text-gray-600">
+      <div className="mt-2 text-sm text-gray-600 lg:leading-8">
         <p>
-          Gồm <span className="font-semibold">{scene.amount}</span> line đèn.{" "}
-          {scene.isSequential ? (
-            <span>
-              Với các group từ{" "}
-              <span className="bg-slate-400 px-1 text-gray-100 rounded-sm">
-                {scene.startGroup}
-              </span>{" "}
-              đến{" "}
-              <span className="bg-slate-400 px-1 text-gray-100 rounded-sm">
-                {scene.startGroup && scene.startGroup + scene.amount}
-              </span>
-            </span>
-          ) : (
-            <span>
-              Với các group gồm{" "}
-              {scene.lights.map((light, index) => (
-                <React.Fragment key={index}>
-                  <span className="bg-slate-400 px-1 text-gray-100 rounded-sm">
-                    {light.group}
-                  </span>
-                  {index < scene.lights.length - 1 && ", "}
-                </React.Fragment>
-              ))}
-            </span>
-          )}
+          - Gồm <span className="font-semibold">{scene.amount}</span> line đèn.
         </p>
+        {scene.isSequential ? (
+          <p>
+            - Với các group từ{" "}
+            <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm">
+              {scene.startGroup}
+            </span>{" "}
+            đến{" "}
+            <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm">
+              {scene.startGroup && scene.startGroup + scene.amount}
+            </span>
+          </p>
+        ) : (
+          <p>
+            - Với các group:{" "}
+            {scene.lights.map((light, index) => (
+              <React.Fragment key={index}>
+                <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm">
+                  {light.group}
+                </span>
+                {index < scene.lights.length - 1 && " "}
+              </React.Fragment>
+            ))}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -246,7 +246,7 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
     <div className="relative">
       <p className="text-gray-400 absolute right-0 top-0"># {index + 1}</p>
       <h3 className="font-bold text-red-600">{schedule.name}</h3>
-      <div className="mt-2 text-sm text-gray-600">
+      <div className="mt-2 text-sm text-gray-600 lg:leading-8">
         {/* <p>Trạng thái: {schedule.enable ? "Kích hoạt" : "Vô hiệu"}</p> */}
         <p>
           - Kích hoạt vào{" "}
@@ -259,10 +259,10 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
           - Gồm các scene:{" "}
           {schedule.sceneGroup.map((id, index) => (
             <React.Fragment key={id}>
-              <span className="bg-slate-400 px-1 text-gray-100 rounded-sm">
+              <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm">
                 {getSceneNameById(id)}
               </span>
-              {index < schedule.sceneGroup.length - 1 && ", "}
+              {index < schedule.sceneGroup.length - 1 && " "}
             </React.Fragment>
           ))}
         </p>
