@@ -512,11 +512,11 @@ export default function Generator() {
                       <div key={sceneIndex}>
                         {sceneIndex >= 0 && (
                           <div className="flex flex-col items-center gap-2 pointer-events-none select-none">
-                            <div className="w-px h-6 bg-gray-200" />
+                            <div className="w-px h-4 bg-gray-200" />
                             <div className="px-4 py-1 rounded-full bg-gray-100 text-gray-500 text-sm font-medium">
                               Scene #{sceneIndex + 1}
                             </div>
-                            <div className="w-px h-6 bg-gray-200" />
+                            <div className="w-px h-4 bg-gray-200" />
                           </div>
                         )}
                         <div className="border p-4 rounded-lg shadow-sm relative bg-[#f3f4f641]">
@@ -564,26 +564,6 @@ export default function Generator() {
                             />
                             <Label>Group đèn liên tục</Label>
                           </div>
-
-                          <Alert className="mb-4">
-                            <Terminal className="h-4 w-4" />
-                            <AlertTitle className="font-bold">
-                              Các anh chú ý!
-                            </AlertTitle>
-                            <AlertDescription>
-                              Nếu scene cần tạo có line đèn là các địa chỉ group
-                              liên tiếp nhau một mạch, ví dụ từ group 1 → group
-                              10, thì bật chế độ{" "}
-                              <strong className="text-red-700">
-                                Group đèn liên tục
-                              </strong>{" "}
-                              này lên. Và, độ sáng các đèn này phải đồng nhất
-                              bằng nhau thì mới được, còn các đèn độ sáng khác
-                              nhau thì hãy tắt cái này và điền thủ công bên
-                              dưới.
-                            </AlertDescription>
-                          </Alert>
-
                           <LightList
                             scene={scene}
                             sceneIndex={sceneIndex}
@@ -630,11 +610,11 @@ export default function Generator() {
                       <div key={scheduleIndex}>
                         {scheduleIndex >= 0 && (
                           <div className="flex flex-col items-center gap-2 pointer-events-none select-none">
-                            <div className="w-px h-6 bg-gray-200" />
+                            <div className="w-px h-4 bg-gray-200" />
                             <div className="px-4 py-1 rounded-full bg-gray-100 text-gray-500 text-sm font-medium">
                               Schedule #{scheduleIndex + 1}
                             </div>
-                            <div className="w-px h-6 bg-gray-200" />
+                            <div className="w-px h-4 bg-gray-200" />
                           </div>
                         )}
                         <div className="border p-4 rounded-lg space-y-4 shadow-sm relative bg-[#f3f4f641]">
@@ -723,23 +703,6 @@ export default function Generator() {
                               ))}
                             </div>
                           </div>
-
-                          <Alert>
-                            <Terminal className="h-4 w-4" />
-                            <AlertTitle className="font-bold">
-                              Các anh chú ý!
-                            </AlertTitle>
-                            <AlertDescription>
-                              Ở phần chọn Scene này sẽ liệt kê{" "}
-                              <strong className="text-red-700">
-                                tất cả các scene đã được tạo
-                              </strong>{" "}
-                              ở tab Ngữ cảnh (Scene) bên trên, và giờ chỉ cần
-                              tick chọn những scene tương ứng cho Schedule này
-                              là được.
-                            </AlertDescription>
-                          </Alert>
-
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <Label>Giờ kích hoạt:</Label>
