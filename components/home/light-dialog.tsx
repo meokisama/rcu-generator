@@ -165,7 +165,7 @@ export const LightListDialog = memo<LightListDialogProps>(
           <DialogTrigger asChild>
             <Button variant="outline" className="flex items-center gap-2">
               <List className="h-4 w-4" />
-              Danh sách đèn ({lights.length})
+              Chỉnh sửa ({lights.length})
             </Button>
           </DialogTrigger>
         </div>

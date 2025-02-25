@@ -616,41 +616,40 @@ export default function Generator() {
     "/*\n  Để tối ưu hiệu năng, chức năng tạo code thời gian thực sẽ bị loại bỏ.\n  Hiện tại nếu muốn xem code, hãy ấn nút Refresh ở cạnh nút Download.\n*/\n"
   );
 
-  // Optimized code generation function for scenes with memoization
-  const generateSceneCode = useCallback(() => {
-    return scenes
-      .map((scene, sceneIndex) => {
-        let code = `// ${scene.name}\n`;
-        code += `sceneObj[${sceneIndex}].amount = ${scene.amount};\n`;
-
-        if (scene.isSequential) {
-          code += `for(i=0; i<sceneObj[${sceneIndex}].amount; i++) {\n`;
-          code += `\tsceneObj[${sceneIndex}].outputObj[i].type = OBJ_LIGHTING;\n`;
-          code += `\tsceneObj[${sceneIndex}].outputObj[i].group = i + ${scene.startGroup};\n`;
-          code += `\tsceneObj[${sceneIndex}].outputObj[i].value = ${scene.lights[0].value}*255/100;\n`;
-          code += `}\n`;
-        } else {
-          scene.lights.forEach((light, lightIndex) => {
-            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].type = OBJ_LIGHTING;\n`;
-            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].group = ${light.group};\n`;
-            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].value = ${light.value}*255/100;\n`;
-          });
-        }
-        return code + "\n";
-      })
-      .join("");
-  }, [scenes]);
-
   // Optimized code generation function for schedules with memoization
   const generateScheduleCode = useCallback(() => {
+    const sceneIndexMap = new Map<number, number[]>();
+    let expandedIndex = 0;
+
+    scenes.forEach((scene, originalIndex) => {
+      if (!scene.isSequential && scene.lights.length > 60) {
+        const parts = Math.ceil(scene.lights.length / 60);
+        const indices = [];
+        for (let i = 0; i < parts; i++) {
+          indices.push(expandedIndex++);
+        }
+        sceneIndexMap.set(originalIndex + 1, indices);
+      } else {
+        sceneIndexMap.set(originalIndex + 1, [expandedIndex++]);
+      }
+    });
+
     return schedules
       .map((schedule, index) => {
         let code = `// ${schedule.name}\n`;
         code += `schedule[${index}].enable = ${schedule.enable ? 1 : 0};\n`;
-        code += `schedule[${index}].sceneAmount = ${schedule.sceneAmount};\n`;
+        const expandedSceneGroups: number[] = [];
+        schedule.sceneGroup.forEach((originalSceneIndex) => {
+          const expandedIndices = sceneIndexMap.get(originalSceneIndex) || [];
+          expandedSceneGroups.push(...expandedIndices);
+        });
 
-        schedule.sceneGroup.forEach((group, groupIndex) => {
-          code += `schedule[${index}].sceneGroup[${groupIndex}] = ${group};\n`;
+        code += `schedule[${index}].sceneAmount = ${expandedSceneGroups.length};\n`;
+
+        expandedSceneGroups.forEach((group, groupIndex) => {
+          code += `schedule[${index}].sceneGroup[${groupIndex}] = ${
+            group + 1
+          };\n`;
         });
 
         code += "\n";
@@ -669,7 +668,7 @@ export default function Generator() {
         return code + "\n";
       })
       .join("");
-  }, [schedules]);
+  }, [scenes, schedules]);
 
   // Handler functions with memoization
   const handleSceneNameChange = useCallback(
@@ -986,22 +985,95 @@ export default function Generator() {
     dispatch({ type: "SET_ACTIVE_TAB", tab: value });
   }, []);
 
+  const splitSceneForCodeGeneration = (scene: Scene): Scene[] => {
+    if (!scene.isSequential && scene.lights.length > 60) {
+      const numberOfScenes = Math.ceil(scene.lights.length / 60);
+      const result: Scene[] = [];
+
+      for (let i = 0; i < numberOfScenes; i++) {
+        const startIndex = i * 60;
+        const endIndex = Math.min((i + 1) * 60, scene.lights.length);
+        const sceneLights = scene.lights.slice(startIndex, endIndex);
+
+        result.push({
+          ...scene,
+          name: i === 0 ? scene.name : `${scene.name} (phần ${i + 1})`,
+          amount: sceneLights.length,
+          lights: sceneLights,
+        });
+      }
+
+      return result;
+    }
+    return [scene];
+  };
+
+  const generateOptimizedSceneCode = useCallback((scenes: Scene[]): string => {
+    const expandedScenes: Scene[] = [];
+    scenes.forEach((scene) => {
+      expandedScenes.push(...splitSceneForCodeGeneration(scene));
+    });
+
+    return expandedScenes
+      .map((scene, sceneIndex) => {
+        let code = `// ${scene.name}\n`;
+        code += `sceneObj[${sceneIndex}].amount = ${scene.amount};\n`;
+
+        if (scene.isSequential) {
+          code += `for(i=0; i<sceneObj[${sceneIndex}].amount; i++) {\n`;
+          code += `\tsceneObj[${sceneIndex}].outputObj[i].type = OBJ_LIGHTING;\n`;
+          code += `\tsceneObj[${sceneIndex}].outputObj[i].group = i + ${scene.startGroup};\n`;
+          code += `\tsceneObj[${sceneIndex}].outputObj[i].value = ${scene.lights[0].value}*255/100;\n`;
+          code += `}\n`;
+        } else {
+          scene.lights.forEach((light, lightIndex) => {
+            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].type = OBJ_LIGHTING;\n`;
+            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].group = ${light.group};\n`;
+            code += `sceneObj[${sceneIndex}].outputObj[${lightIndex}].value = ${light.value}*255/100;\n`;
+          });
+        }
+        return code + "\n";
+      })
+      .join("");
+  }, []);
+
   const handleRefresh = useCallback(() => {
-    const sceneCode = generateSceneCode();
+    const sceneCode = generateOptimizedSceneCode(scenes);
     const scheduleCode = generateScheduleCode();
     const fullCode = `// Scene Configuration\n${sceneCode}\n// Schedule Configuration\n${scheduleCode}`;
 
     setGeneratedCode(fullCode);
-  }, [generateSceneCode, generateScheduleCode]);
+  }, [generateOptimizedSceneCode, generateScheduleCode, scenes]);
 
   const handleDownload = useCallback(() => {
-    const sceneCode = generateSceneCode();
+    const sceneCode = generateOptimizedSceneCode(scenes);
     const scheduleCode = generateScheduleCode();
+
+    const scenesWithManyLights = scenes.filter(
+      (scene) => !scene.isSequential && scene.lights.length > 60
+    );
+
     const fullCode = `// Scene Configuration\n${sceneCode}\n// Schedule Configuration\n${scheduleCode}`;
 
     setGeneratedCode(fullCode);
 
-    // Create blob and download
+    if (scenesWithManyLights.length > 0) {
+      const sceneNames = scenesWithManyLights
+        .map((scene) => scene.name)
+        .join(", ");
+      const totalScenesAfterSplit =
+        scenes.length +
+        scenesWithManyLights.reduce(
+          (acc, scene) => acc + Math.ceil(scene.lights.length / 60) - 1,
+          0
+        );
+
+      toast.info("Một số scene đã được tách khi tạo code!", {
+        description: `${sceneNames} có nhiều hơn 60 đèn và đã được tách thành nhiều scene trong code. Tổng số scene trong code: ${totalScenesAfterSplit}.`,
+        duration: 8000,
+      });
+    }
+
     const blob = new Blob([fullCode], { type: "text/plain" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1017,7 +1089,7 @@ export default function Generator() {
         "Code đã được tải xuống, đọc phần chú ý và gửi file này cho anh Hoài An.",
       duration: 8000,
     });
-  }, [generateSceneCode, generateScheduleCode]);
+  }, [generateOptimizedSceneCode, generateScheduleCode, scenes]);
 
   // Memoized CodeBlock props to prevent re-renders when unrelated state changes
   const codeBlockProps = useMemo(() => {
