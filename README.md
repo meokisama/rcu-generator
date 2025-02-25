@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<p align="center">
+    <img style="width:10%;" src="./public/logo.png" />
+</p>
 
-## Getting Started
+<h2 align="center"> Scenes & Schedules Generator</h2>
 
-First, run the development server:
+<h4 align="center"> A modern RCU generator with a clean yet expressive design. </h4>
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+<p align="center">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg"/>
+    <img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg"/>
+</p>
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## About
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+A NextJS application for managing lighting scenes and schedules. This tool allows users to create, edit, and manage lighting configurations and scheduling in an intuitive interface.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Features
 
-## Learn More
+- **Scene Management**: Create and configure lighting scenes with individual control over each light
 
-To learn more about Next.js, take a look at the following resources:
+  - Sequential or individual light grouping
+  - Customizable light names, groups, and values
+  - Support for unlimited number of lights per scene
+  - Copy, edit, and delete scenes
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Schedule Management**: Set up time-based schedules for your lighting scenes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+  - Select which scenes to include in each schedule
+  - Configure day-of-week activation
+  - Set specific hours and minutes for schedule activation
+  - Enable/disable schedules as needed
 
-## Deploy on Vercel
+- **Code Generation**: Generate and download code for your lighting configuration
+  - Automatic splitting of large scenes (>60 lights) for compatibility
+  - Optimized code generation for better performance
+  - Easy to download and distribute
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Technologies
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- React with Hooks and Context API
+- shadcn/ui component library for modern UI elements
+- Optimized with memoization for better performance
+- Error Boundary for robust error handling
+- Lazy loading for improved performance
+
+## Notes
+
+- Scenes with more than 60 lights are automatically split into multiple scenes in the generated code
+- Changes to scenes are reflected in schedules automatically
+- The application uses local state only; no data is saved to a server

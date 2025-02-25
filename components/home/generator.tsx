@@ -1277,9 +1277,16 @@ export default function Generator() {
                   <Terminal className="h-4 w-4" />
                   <AlertTitle className="font-bold">Ghi chú!</AlertTitle>
                   <AlertDescription>
-                    Sau khi thêm scene & schedule xong xuôi rồi ấn{" "}
-                    <strong className="text-red-600">Download</strong> và gửi
-                    file này cho anh Hoài An là được.
+                    <p>
+                      - Nhấn nút{" "}
+                      <strong className="text-red-600">Refresh</strong> để xem
+                      code đã được tạo nếu muốn.
+                    </p>
+                    <p>
+                      - Sau khi thêm scene & schedule xong xuôi toàn bộ, nhấn{" "}
+                      <strong className="text-red-600">Download</strong> và gửi
+                      file này cho anh Hoài An là được.
+                    </p>
                   </AlertDescription>
                 </Alert>
               </CardFooter>

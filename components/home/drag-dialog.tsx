@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -69,7 +69,7 @@ interface OverviewDialogProps {
 
 type TabType = "scenes" | "schedules";
 
-const SortableItem: React.FC<SortableItemProps> = ({ id, children }) => {
+const SortableItem = React.memo<SortableItemProps>(({ id, children }) => {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id });
 
@@ -89,7 +89,8 @@ const SortableItem: React.FC<SortableItemProps> = ({ id, children }) => {
       {children}
     </div>
   );
-};
+});
+SortableItem.displayName = "SortableItem";
 
 const OverviewDialog: React.FC<OverviewDialogProps> = ({
   scenes,
@@ -101,86 +102,118 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>("scenes");
 
   const sensors = useSensors(
-    useSensor(PointerSensor),
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 100,
+        tolerance: 5,
+      },
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
 
-  const updateScheduleReferences = (
-    oldScenes: Scene[],
-    newScenes: Scene[],
-    currentSchedules: Schedule[]
-  ): Schedule[] => {
-    // Create mapping of old positions to new positions
-    const scenePositionMap = new Map<number, number>();
-    oldScenes.forEach((scene, oldIndex) => {
-      const newIndex = newScenes.findIndex(
-        (newScene) => newScene.name === scene.name
-      );
-      scenePositionMap.set(oldIndex + 1, newIndex + 1);
-    });
+  const updateScheduleReferences = useCallback(
+    (
+      oldScenes: Scene[],
+      newScenes: Scene[],
+      currentSchedules: Schedule[]
+    ): Schedule[] => {
+      const scenePositionMap = new Map<number, number>();
 
-    // Update all schedule references
-    return currentSchedules.map((schedule) => ({
-      ...schedule,
-      sceneGroup: schedule.sceneGroup.map(
-        (oldSceneNumber) =>
-          scenePositionMap.get(oldSceneNumber) || oldSceneNumber
-      ),
-    }));
-  };
-
-  const handleDragEnd = (event: DragEndEvent): void => {
-    const { active, over } = event;
-
-    if (active.id !== over?.id) {
-      if (activeTab === "scenes") {
-        const oldScenes = [...scenes];
-        const oldIndex = scenes.findIndex(
-          (scene) => `scenes-${scene.name}` === active.id
-        );
-        const newIndex = scenes.findIndex(
-          (scene) => `scenes-${scene.name}` === over?.id
+      oldScenes.forEach((scene, oldIndex) => {
+        const newIndex = newScenes.findIndex(
+          (newScene) =>
+            newScene.name === scene.name &&
+            JSON.stringify(newScene.lights) === JSON.stringify(scene.lights)
         );
 
-        const newScenes = [...scenes];
-        const [removed] = newScenes.splice(oldIndex, 1);
-        newScenes.splice(newIndex, 0, removed);
+        if (newIndex !== -1) {
+          scenePositionMap.set(oldIndex + 1, newIndex + 1);
+        }
+      });
 
-        // Update scenes and their references in schedules
-        setScenes(newScenes);
-        const updatedSchedules = updateScheduleReferences(
-          oldScenes,
-          newScenes,
-          schedules
-        );
-        setSchedules(updatedSchedules);
-      } else {
-        // Handle schedule reordering
-        const oldIndex = schedules.findIndex(
-          (schedule) => `schedules-${schedule.name}` === active.id
-        );
-        const newIndex = schedules.findIndex(
-          (schedule) => `schedules-${schedule.name}` === over?.id
-        );
+      return currentSchedules.map((schedule) => ({
+        ...schedule,
+        sceneGroup: schedule.sceneGroup
+          .map((oldSceneNumber) =>
+            scenePositionMap.has(oldSceneNumber)
+              ? scenePositionMap.get(oldSceneNumber)
+              : oldSceneNumber
+          )
+          .filter((num): num is number => num !== undefined),
+      }));
+    },
+    []
+  );
 
-        const newSchedules = [...schedules];
-        const [removed] = newSchedules.splice(oldIndex, 1);
-        newSchedules.splice(newIndex, 0, removed);
+  // Handle drag end with memoization
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent): void => {
+      const { active, over } = event;
 
-        setSchedules(newSchedules);
+      if (over && active.id !== over.id) {
+        if (activeTab === "scenes") {
+          const oldScenes = [...scenes];
+          const oldIndex = scenes.findIndex(
+            (scene, idx) => `scenes-${scene.name}-${idx}` === active.id
+          );
+
+          const newIndex = scenes.findIndex(
+            (scene, idx) => `scenes-${scene.name}-${idx}` === over.id
+          );
+
+          if (oldIndex !== -1 && newIndex !== -1) {
+            const newScenes = [...scenes];
+            const [movedScene] = newScenes.splice(oldIndex, 1);
+            newScenes.splice(newIndex, 0, movedScene);
+
+            setScenes(newScenes);
+
+            const updatedSchedules = updateScheduleReferences(
+              oldScenes,
+              newScenes,
+              schedules
+            );
+            setSchedules(updatedSchedules);
+          }
+        } else {
+          const oldIndex = schedules.findIndex(
+            (schedule, idx) => `schedules-${schedule.name}-${idx}` === active.id
+          );
+
+          const newIndex = schedules.findIndex(
+            (schedule, idx) => `schedules-${schedule.name}-${idx}` === over.id
+          );
+
+          // Ensure both indices are valid before proceeding
+          if (oldIndex !== -1 && newIndex !== -1) {
+            const newSchedules = [...schedules];
+            const [movedSchedule] = newSchedules.splice(oldIndex, 1);
+            newSchedules.splice(newIndex, 0, movedSchedule);
+
+            setSchedules(newSchedules);
+          }
+        }
       }
-    }
-  };
+    },
+    [
+      activeTab,
+      scenes,
+      schedules,
+      setScenes,
+      setSchedules,
+      updateScheduleReferences,
+    ]
+  );
 
-  const formatTime = (hour: number, minute: number): string => {
+  const formatTime = useCallback((hour: number, minute: number): string => {
     return `${hour.toString().padStart(2, "0")}:${minute
       .toString()
       .padStart(2, "0")}`;
-  };
+  }, []);
 
-  const getActiveDays = (schedule: Schedule): string => {
+  const getActiveDays = useCallback((schedule: Schedule): string => {
     const days: { [key: string]: boolean } = {
       T2: schedule.monday,
       T3: schedule.tuesday,
@@ -198,78 +231,107 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
         .map(([day]) => day)
         .join(", ")
     );
-  };
+  }, []);
 
-  const getSceneNameById = (sceneId: number): string => {
-    return scenes[sceneId - 1]?.name || `Scene ${sceneId}`;
-  };
+  const getSceneNameById = useCallback(
+    (sceneId: number): string => {
+      if (sceneId <= 0 || sceneId > scenes.length) {
+        return `Unknown Scene`;
+      }
+      const scene = scenes[sceneId - 1];
+      return scene?.name || `Scene ${sceneId}`;
+    },
+    [scenes]
+  );
 
-  const renderSceneItem = (scene: Scene, index: number): React.ReactNode => (
-    <div className="relative">
-      <h3 className="font-bold text-red-600">{scene.name}</h3>
-      <p className="text-gray-400 absolute right-0 top-0"># {index + 1}</p>
-      <div className="mt-2 text-sm text-gray-600 lg:leading-8">
-        <p>
-          - Gồm <span className="font-semibold">{scene.amount}</span> line đèn.
-        </p>
-        {scene.isSequential ? (
+  const renderSceneItem = useCallback(
+    (scene: Scene, index: number): React.ReactNode => (
+      <div className="relative">
+        <h3 className="font-bold text-red-600">{scene.name}</h3>
+        <p className="text-gray-400 absolute right-0 top-0"># {index + 1}</p>
+        <div className="mt-2 text-sm text-gray-600 lg:leading-8">
           <p>
-            - Với các group từ{" "}
-            <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm">
-              {scene.startGroup}
-            </span>{" "}
-            đến{" "}
-            <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm">
-              {scene.startGroup && scene.startGroup + scene.amount}
-            </span>
+            - Gồm <span className="font-semibold">{scene.amount}</span> line
+            đèn.
           </p>
-        ) : (
-          <p>
-            - Với các group:{" "}
-            {scene.lights.map((light, index) => (
-              <React.Fragment key={index}>
-                <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm">
+          {scene.isSequential ? (
+            <p>
+              - Với các group từ{" "}
+              <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm">
+                {scene.startGroup || 1}
+              </span>{" "}
+              đến{" "}
+              <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm">
+                {(scene.startGroup || 1) + scene.amount - 1}
+              </span>
+            </p>
+          ) : (
+            <p>
+              - Với các group:{" "}
+              {scene.lights.map((light, i) => (
+                <span
+                  key={i}
+                  className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm mr-1"
+                >
                   {light.group}
                 </span>
-                {index < scene.lights.length - 1 && " "}
-              </React.Fragment>
-            ))}
-          </p>
-        )}
+              ))}
+            </p>
+          )}
+        </div>
       </div>
-    </div>
+    ),
+    []
   );
 
-  const renderScheduleItem = (
-    schedule: Schedule,
-    index: number
-  ): React.ReactNode => (
-    <div className="relative">
-      <p className="text-gray-400 absolute right-0 top-0"># {index + 1}</p>
-      <h3 className="font-bold text-red-600">{schedule.name}</h3>
-      <div className="mt-2 text-sm text-gray-600 lg:leading-8">
-        {/* <p>Trạng thái: {schedule.enable ? "Kích hoạt" : "Vô hiệu"}</p> */}
-        <p>
-          - Kích hoạt vào{" "}
-          <span className="font-bold">
-            {formatTime(schedule.hour, schedule.minute)}
-          </span>{" "}
-          các ngày <span className="font-bold">{getActiveDays(schedule)}</span>
-        </p>
-        <p>
-          - Gồm các scene:{" "}
-          {schedule.sceneGroup.map((id, index) => (
-            <React.Fragment key={id}>
-              <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm">
-                {getSceneNameById(id)}
-              </span>
-              {index < schedule.sceneGroup.length - 1 && " "}
-            </React.Fragment>
-          ))}
-        </p>
+  const renderScheduleItem = useCallback(
+    (schedule: Schedule, index: number): React.ReactNode => (
+      <div className="relative">
+        <p className="text-gray-400 absolute right-0 top-0"># {index + 1}</p>
+        <h3 className="font-bold text-red-600">{schedule.name}</h3>
+        <div className="mt-2 text-sm text-gray-600 lg:leading-8">
+          <p>
+            - Kích hoạt vào{" "}
+            <span className="font-bold">
+              {formatTime(schedule.hour, schedule.minute)}
+            </span>{" "}
+            các ngày{" "}
+            <span className="font-bold">{getActiveDays(schedule)}</span>
+          </p>
+          <p>
+            - Gồm các scene:{" "}
+            {schedule.sceneGroup.length > 0 ? (
+              schedule.sceneGroup.map((id, i) => (
+                <span
+                  key={i}
+                  className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm mr-1"
+                >
+                  {getSceneNameById(id)}
+                </span>
+              ))
+            ) : (
+              <span className="text-gray-400">Chưa chọn scene nào</span>
+            )}
+          </p>
+        </div>
       </div>
-    </div>
+    ),
+    [formatTime, getActiveDays, getSceneNameById]
   );
+
+  const sceneIds = useMemo(
+    () => scenes.map((scene, idx) => `scenes-${scene.name}-${idx}`),
+    [scenes]
+  );
+
+  const scheduleIds = useMemo(
+    () => schedules.map((schedule, idx) => `schedules-${schedule.name}-${idx}`),
+    [schedules]
+  );
+
+  const handleTabChange = useCallback((tab: TabType) => {
+    setActiveTab(tab);
+  }, []);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -290,14 +352,14 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
           <div className="flex space-x-2 mb-4">
             <Button
               variant={activeTab === "scenes" ? "default" : "outline"}
-              onClick={() => setActiveTab("scenes")}
+              onClick={() => handleTabChange("scenes")}
               className="flex-1"
             >
               Scenes ({scenes.length})
             </Button>
             <Button
               variant={activeTab === "schedules" ? "default" : "outline"}
-              onClick={() => setActiveTab("schedules")}
+              onClick={() => handleTabChange("schedules")}
               className="flex-1"
             >
               Schedules ({schedules.length})
@@ -311,35 +373,40 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
               onDragEnd={handleDragEnd}
             >
               {activeTab === "scenes" ? (
+                scenes.length > 0 ? (
+                  <SortableContext
+                    items={sceneIds}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {scenes.map((scene, index) => (
+                      <SortableItem key={sceneIds[index]} id={sceneIds[index]}>
+                        {renderSceneItem(scene, index)}
+                      </SortableItem>
+                    ))}
+                  </SortableContext>
+                ) : (
+                  <div className="p-4 text-center text-gray-500">
+                    Không có Scene nào được tạo.
+                  </div>
+                )
+              ) : schedules.length > 0 ? (
                 <SortableContext
-                  items={scenes.map((scene) => `scenes-${scene.name}`)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {scenes.map((scene, index) => (
-                    <SortableItem
-                      key={`scenes-${scene.name}`}
-                      id={`scenes-${scene.name}`}
-                    >
-                      {renderSceneItem(scene, index)}
-                    </SortableItem>
-                  ))}
-                </SortableContext>
-              ) : (
-                <SortableContext
-                  items={schedules.map(
-                    (schedule) => `schedules-${schedule.name}`
-                  )}
+                  items={scheduleIds}
                   strategy={verticalListSortingStrategy}
                 >
                   {schedules.map((schedule, index) => (
                     <SortableItem
-                      key={`schedules-${schedule.name}`}
-                      id={`schedules-${schedule.name}`}
+                      key={scheduleIds[index]}
+                      id={scheduleIds[index]}
                     >
                       {renderScheduleItem(schedule, index)}
                     </SortableItem>
                   ))}
                 </SortableContext>
+              ) : (
+                <div className="p-4 text-center text-gray-500">
+                  Không có Schedule nào được tạo.
+                </div>
               )}
             </DndContext>
           </div>
@@ -349,4 +416,4 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
   );
 };
 
-export default OverviewDialog;
+export default React.memo(OverviewDialog);
