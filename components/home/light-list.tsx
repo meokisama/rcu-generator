@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Trash2, PenLine, Sun, Book } from "lucide-react";
 import { LightListDialog } from "./light-dialog";
 import { Card, CardContent } from "@/components/ui/card";
+import ExcelImportDialog from "./import-dialog";
 
 // Types
 interface Light {
@@ -140,6 +141,8 @@ interface LightListProps {
   ) => void;
   handleDeleteLight: (sceneIndex: number, lightIndex: number) => void;
   handleAddLight: (sceneIndex: number) => void;
+  // Thêm prop mới để xử lý import hàng loạt
+  handleBulkAddLights?: (sceneIndex: number, lights: Light[]) => void;
 }
 
 // Optimized LightList component
@@ -153,6 +156,7 @@ const LightList = memo<LightListProps>(
     handleLightNameChange,
     handleDeleteLight,
     handleAddLight,
+    handleBulkAddLights, // Prop mới
   }) => {
     const onAmountChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,6 +175,16 @@ const LightList = memo<LightListProps>(
     const onAddLight = useCallback(() => {
       handleAddLight(sceneIndex);
     }, [handleAddLight, sceneIndex]);
+
+    // Handler cho chức năng import từ Excel
+    const onImportLights = useCallback(
+      (lights: Light[]) => {
+        if (handleBulkAddLights) {
+          handleBulkAddLights(sceneIndex, lights);
+        }
+      },
+      [handleBulkAddLights, sceneIndex]
+    );
 
     const isLargeList = scene.lights.length > 10;
 
@@ -211,16 +225,27 @@ const LightList = memo<LightListProps>(
           </div>
         ) : (
           <>
-            <div className="gap-4">
-              <div>
-                <Label>Số lượng đèn:</Label>
+            <div className="flex justify-between gap-4">
+              <div className="flex-1">
+                <Label>Nhập số lượng đèn (nếu cần): </Label>
                 <Input
                   type="number"
                   min="1"
                   value={scene.amount}
                   onChange={onAmountChange}
+                  className="mt-2"
                 />
               </div>
+
+              {/* Thêm nút import từ Excel ở đây */}
+              {handleBulkAddLights && (
+                <div className="flex items-end">
+                  <ExcelImportDialog
+                    sceneIndex={sceneIndex}
+                    onImport={onImportLights}
+                  />
+                </div>
+              )}
             </div>
 
             {isLargeList ? (
@@ -274,14 +299,24 @@ const LightList = memo<LightListProps>(
                     showDeleteButton={scene.lights.length > 1}
                   />
                 ))}
-                <Button
-                  variant="outline"
-                  onClick={onAddLight}
-                  className="w-full flex items-center justify-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
-                  Thêm đèn
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={onAddLight}
+                    className="flex-1 flex items-center justify-center gap-2"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Thêm đèn
+                  </Button>
+
+                  {/* Thêm nút import từ Excel ở cuối danh sách đèn khi không có nhiều đèn */}
+                  {/* {handleBulkAddLights && !isLargeList && (
+                    <ExcelImportDialog
+                      sceneIndex={sceneIndex}
+                      onImport={onImportLights}
+                    />
+                  )} */}
+                </div>
               </div>
             )}
           </>

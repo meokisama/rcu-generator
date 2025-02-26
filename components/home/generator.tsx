@@ -270,6 +270,7 @@ interface SceneItemProps {
   handleDeleteLight: (sceneIndex: number, lightIndex: number) => void;
   handleAddLight: (sceneIndex: number) => void;
   canDelete: boolean;
+  handleBulkAddLights?: (sceneIndex: number, lights: Light[]) => void;
 }
 
 // Scene component for individual scene controls
@@ -288,6 +289,7 @@ const SceneItem = memo<SceneItemProps>(
     handleDeleteLight,
     handleAddLight,
     canDelete,
+    handleBulkAddLights,
   }) => {
     const onNameChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -366,6 +368,7 @@ const SceneItem = memo<SceneItemProps>(
             handleLightNameChange={handleLightNameChange}
             handleDeleteLight={handleDeleteLight}
             handleAddLight={handleAddLight}
+            handleBulkAddLights={handleBulkAddLights}
           />
         </div>
       </div>
@@ -1112,6 +1115,30 @@ export default function Generator() {
     };
   }, [scenes, schedules]);
 
+  const handleBulkAddLights = useCallback(
+    (sceneIndex: number, newLights: Light[]) => {
+      if (newLights.length === 0) return;
+
+      const currentScene = scenes[sceneIndex];
+      const updatedScene = cloneDeep(currentScene);
+
+      updatedScene.lights = [...updatedScene.lights, ...newLights];
+      updatedScene.amount = updatedScene.lights.length;
+
+      dispatch({
+        type: "UPDATE_SCENE",
+        index: sceneIndex,
+        scene: updatedScene,
+      });
+
+      toast.success(`Đã thêm ${newLights.length} đèn vào scene!`, {
+        description: "Các đèn mới đã được thêm vào danh sách.",
+        duration: 6000,
+      });
+    },
+    [scenes]
+  );
+
   // Render scenes list memoized
   const renderScenes = useMemo(() => {
     return scenes.map((scene, sceneIndex) => (
@@ -1130,6 +1157,7 @@ export default function Generator() {
         handleDeleteLight={handleDeleteLight}
         handleAddLight={handleAddLight}
         canDelete={scenes.length > 1}
+        handleBulkAddLights={handleBulkAddLights}
       />
     ));
   }, [
@@ -1144,6 +1172,7 @@ export default function Generator() {
     handleLightNameChange,
     handleDeleteLight,
     handleAddLight,
+    handleBulkAddLights,
   ]);
 
   // Render schedules list memoized
