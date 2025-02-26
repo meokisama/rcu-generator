@@ -22,7 +22,6 @@ interface Scene {
   startGroup?: number;
 }
 
-// Light component for individual light controls
 interface LightItemProps {
   light: Light;
   lightIndex: number;
@@ -121,8 +120,6 @@ const LightItem = memo<LightItemProps>(
   }
 );
 LightItem.displayName = "LightItem";
-
-// Props for LightList component
 interface LightListProps {
   scene: Scene;
   sceneIndex: number;
@@ -141,11 +138,9 @@ interface LightListProps {
   ) => void;
   handleDeleteLight: (sceneIndex: number, lightIndex: number) => void;
   handleAddLight: (sceneIndex: number) => void;
-  // Thêm prop mới để xử lý import hàng loạt
   handleBulkAddLights?: (sceneIndex: number, lights: Light[]) => void;
 }
 
-// Optimized LightList component
 const LightList = memo<LightListProps>(
   ({
     scene,
@@ -156,7 +151,7 @@ const LightList = memo<LightListProps>(
     handleLightNameChange,
     handleDeleteLight,
     handleAddLight,
-    handleBulkAddLights, // Prop mới
+    handleBulkAddLights,
   }) => {
     const onAmountChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,7 +171,6 @@ const LightList = memo<LightListProps>(
       handleAddLight(sceneIndex);
     }, [handleAddLight, sceneIndex]);
 
-    // Handler cho chức năng import từ Excel
     const onImportLights = useCallback(
       (lights: Light[]) => {
         if (handleBulkAddLights) {
@@ -237,7 +231,6 @@ const LightList = memo<LightListProps>(
                 />
               </div>
 
-              {/* Thêm nút import từ Excel ở đây */}
               {handleBulkAddLights && (
                 <div className="flex items-end">
                   <ExcelImportDialog
@@ -249,7 +242,6 @@ const LightList = memo<LightListProps>(
             </div>
 
             {isLargeList ? (
-              // Render dialog for large list
               <Card>
                 <CardContent className="p-4 bg-[#f3f4f641]">
                   <div className="space-y-4">
@@ -261,7 +253,6 @@ const LightList = memo<LightListProps>(
                       handleDeleteLight={handleDeleteLight}
                       handleAddLight={handleAddLight}
                     />
-                    {/* Show first few lights as preview */}
                     <div className="space-y-2">
                       {scene.lights.slice(0, 3).map((light, lightIndex) => (
                         <LightItem
@@ -272,7 +263,7 @@ const LightList = memo<LightListProps>(
                           handleLightChange={handleLightChange}
                           handleLightNameChange={handleLightNameChange}
                           handleDeleteLight={handleDeleteLight}
-                          showDeleteButton={false} // Don't show delete in preview
+                          showDeleteButton={false}
                         />
                       ))}
                       {scene.lights.length > 3 && (
@@ -285,7 +276,6 @@ const LightList = memo<LightListProps>(
                 </CardContent>
               </Card>
             ) : (
-              // Render inline list for small list
               <div className="space-y-2">
                 {scene.lights.map((light, lightIndex) => (
                   <LightItem
@@ -308,14 +298,6 @@ const LightList = memo<LightListProps>(
                     <Plus className="h-4 w-4" />
                     Thêm đèn
                   </Button>
-
-                  {/* Thêm nút import từ Excel ở cuối danh sách đèn khi không có nhiều đèn */}
-                  {/* {handleBulkAddLights && !isLargeList && (
-                    <ExcelImportDialog
-                      sceneIndex={sceneIndex}
-                      onImport={onImportLights}
-                    />
-                  )} */}
                 </div>
               </div>
             )}

@@ -101,11 +101,25 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
     return !isNaN(numValue) && numValue >= 0 && numValue <= 100;
   };
 
-  const validateGroup = (group: string): boolean => {
-    if (group === "") return false;
+  const extractNumberFromString = (str: string): number | null => {
+    const matches = str.match(/\d+/);
+    if (matches && matches.length > 0) {
+      return parseInt(matches[0]);
+    }
+    return null;
+  };
 
-    const numValue = parseInt(group);
-    return !isNaN(numValue) && numValue >= 1;
+  const validateAndExtractGroup = (
+    group: string
+  ): { isValid: boolean; extractedValue: string } => {
+    if (group === "") return { isValid: false, extractedValue: "" };
+
+    const groupNumber = extractNumberFromString(group);
+    if (groupNumber !== null && groupNumber >= 1) {
+      return { isValid: true, extractedValue: groupNumber.toString() };
+    }
+
+    return { isValid: false, extractedValue: group };
   };
 
   const handleCellChange = (
@@ -116,17 +130,14 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
     const newData = [...tableData];
 
     if (field === "group") {
-      // Kiểm tra giá trị group
-      const isValid = validateGroup(value);
-      newData[rowIndex].group = value;
+      const { isValid, extractedValue } = validateAndExtractGroup(value);
+      newData[rowIndex].group = extractedValue;
       newData[rowIndex].groupValid = isValid;
     } else if (field === "value") {
-      // Kiểm tra giá trị độ sáng
       const isValid = validateValue(value);
       newData[rowIndex].value = value.replace("%", "");
       newData[rowIndex].valueValid = isValid;
     } else {
-      // Tên đèn luôn được coi là hợp lệ
       newData[rowIndex].name = value;
       newData[rowIndex].nameValid = true;
     }
@@ -172,8 +183,10 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
             newData[currentRowIndex].name = cellValue;
             newData[currentRowIndex].nameValid = true;
           } else if (colName === "group") {
-            newData[currentRowIndex].group = cellValue;
-            newData[currentRowIndex].groupValid = validateGroup(cellValue);
+            const { isValid, extractedValue } =
+              validateAndExtractGroup(cellValue);
+            newData[currentRowIndex].group = extractedValue;
+            newData[currentRowIndex].groupValid = isValid;
           } else if (colName === "value") {
             const cleanValue = cellValue.replace("%", "");
             newData[currentRowIndex].value = cleanValue;
@@ -193,7 +206,6 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
     }
   };
 
-  // Chuyển đổi tên cột sang index (0, 1, 2)
   const getColumnIndex = (colName: string): number => {
     switch (colName) {
       case "name":
@@ -207,7 +219,6 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
     }
   };
 
-  // Chuyển đổi index sang tên cột
   const getColumnName = (index: number): string => {
     switch (index) {
       case 0:

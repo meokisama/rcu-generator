@@ -598,10 +598,8 @@ const ScheduleItem = memo<ScheduleItemProps>(
 );
 ScheduleItem.displayName = "ScheduleItem";
 
-// Memoized CodeBlock to prevent unnecessary re-renders
 const MemoizedCodeBlock = memo(CodeBlock);
 
-// Props for OverviewDialog
 interface OverviewDialogProps {
   scenes: Scene[];
   setScenes: (scenes: Scene[]) => void;
@@ -614,12 +612,10 @@ export default function Generator() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const { scenes, schedules, activeTab } = state;
 
-  // Keep generatedCode as a separate state that's only updated on demand
   const [generatedCode, setGeneratedCode] = useState<string>(
     "/*\n  Để tối ưu hiệu năng, chức năng tạo code thời gian thực sẽ bị loại bỏ.\n  Hiện tại nếu muốn xem code, hãy ấn nút Refresh ở cạnh nút Download.\n*/\n"
   );
 
-  // Optimized code generation function for schedules with memoization
   const generateScheduleCode = useCallback(() => {
     const sceneIndexMap = new Map<number, number[]>();
     let expandedIndex = 0;
@@ -1236,6 +1232,20 @@ export default function Generator() {
               <TabsContent value="scene">
                 <Card>
                   <CardContent className="pt-6">
+                    <Alert className="mb-4 shadow-sm">
+                      <Terminal className="h-4 w-4" />
+                      <AlertTitle className="font-bold">Ghi chú!</AlertTitle>
+                      <AlertDescription>
+                        <p>
+                          Không cần tách ra 60 line đèn cho mỗi scene, hãy{" "}
+                          <strong className="text-red-600">
+                            nhập hết toàn bộ
+                          </strong>{" "}
+                          mọi line đèn cho scene tương ứng luôn để dễ quản lý,
+                          hệ thống sẽ làm hết phần còn lại.
+                        </p>
+                      </AlertDescription>
+                    </Alert>
                     <div className="space-y-0">{renderScenes}</div>
                     <div className="mt-10 w-full">
                       <Button

@@ -19,7 +19,6 @@ interface Light {
   name: string;
 }
 
-// Props for LightItem component
 interface LightItemProps {
   light: Light;
   lightIndex: number;
@@ -39,7 +38,6 @@ interface LightItemProps {
   showDeleteButton: boolean;
 }
 
-// Light component for individual light controls
 const LightItem = memo<LightItemProps>(
   ({
     light,
@@ -119,8 +117,6 @@ const LightItem = memo<LightItemProps>(
   }
 );
 LightItem.displayName = "LightItem";
-
-// Props for LightListDialog component
 interface LightListDialogProps {
   lights: Light[];
   sceneIndex: number;
@@ -139,7 +135,6 @@ interface LightListDialogProps {
   handleAddLight: (sceneIndex: number) => void;
 }
 
-// Dialog component for displaying a large list of lights
 export const LightListDialog = memo<LightListDialogProps>(
   ({
     lights,
