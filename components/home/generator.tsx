@@ -29,6 +29,7 @@ import { CodeBlock } from "@/components/ui/code-block";
 import { cloneDeep } from "lodash";
 import { ErrorBoundary } from "react-error-boundary";
 import LightList from "./light-list";
+import Image from "next/image";
 
 // Lazy loaded components
 const OverviewDialog = lazy(() => import("@/components/home/drag-dialog"));
@@ -1258,6 +1259,15 @@ export default function Generator() {
                     </div>
                   </CardContent>
                 </Card>
+                {scenes.length > 1 && (
+                  <Image
+                    src="/chibi.png"
+                    alt="Chibi"
+                    width={200}
+                    height={200}
+                    className="h-auto mx-auto mt-10"
+                  />
+                )}
               </TabsContent>
 
               <TabsContent value="schedule">
@@ -1275,6 +1285,15 @@ export default function Generator() {
                     </div>
                   </CardContent>
                 </Card>
+                {schedules.length > 1 && (
+                  <Image
+                    src="/chibi.png"
+                    alt="Chibi"
+                    width={200}
+                    height={200}
+                    className="h-auto mx-auto mt-10"
+                  />
+                )}
               </TabsContent>
             </Tabs>
           </div>

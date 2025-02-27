@@ -269,12 +269,12 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
             <p>
               - Với các group:{" "}
               {scene.lights.map((light, i) => (
-                <span
-                  key={i}
-                  className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm mr-1"
-                >
-                  {light.group}
-                </span>
+                <React.Fragment key={i}>
+                  <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm mr-1">
+                    {light.group}
+                  </span>
+                  {i < scene.lights.length - 1 && " "}
+                </React.Fragment>
               ))}
             </p>
           )}
@@ -302,12 +302,12 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
             - Gồm các scene:{" "}
             {schedule.sceneGroup.length > 0 ? (
               schedule.sceneGroup.map((id, i) => (
-                <span
-                  key={i}
-                  className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm mr-1"
-                >
-                  {getSceneNameById(id)}
-                </span>
+                <React.Fragment key={i}>
+                  <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm mr-1">
+                    {getSceneNameById(id)}
+                  </span>
+                  {i < schedule.sceneGroup.length - 1 && " "}
+                </React.Fragment>
               ))
             ) : (
               <span className="text-gray-400">Chưa chọn scene nào</span>
