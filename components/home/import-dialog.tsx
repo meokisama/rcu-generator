@@ -11,7 +11,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TableIcon, AlertCircle, Copy, Trash2, Book, Sun } from "lucide-react";
+import {
+  TableIcon,
+  AlertCircle,
+  Copy,
+  Trash2,
+  Book,
+  Sun,
+  PenLine,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -367,7 +375,8 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
                         }
                       >
                         <TableCell className="w-12 py-2">{index + 1}</TableCell>
-                        <TableCell className="w-2/5 py-2">
+                        <TableCell className="w-2/5 py-2 relative">
+                          <PenLine className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                           <Input
                             value={row.name}
                             onChange={(e) =>
@@ -375,7 +384,7 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
                             }
                             onFocus={() => handleCellFocus(index, "name")}
                             placeholder="Tên đèn"
-                            className="h-8"
+                            className="h-8 pl-8"
                           />
                         </TableCell>
                         <TableCell className="w-1/5 py-2 relative">

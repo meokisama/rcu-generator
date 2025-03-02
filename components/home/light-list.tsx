@@ -3,7 +3,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, PenLine, Sun, Book } from "lucide-react";
-import { LightListDialog } from "./light-dialog";
+import { EnhancedLightDialog } from "./light-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import ExcelImportDialog from "./import-dialog";
 
@@ -39,6 +39,7 @@ interface LightItemProps {
   ) => void;
   handleDeleteLight: (sceneIndex: number, lightIndex: number) => void;
   showDeleteButton: boolean;
+  handleBulkUpdateLights?: (sceneIndex: number, lights: Light[]) => void;
 }
 
 const LightItem = memo<LightItemProps>(
@@ -120,6 +121,7 @@ const LightItem = memo<LightItemProps>(
   }
 );
 LightItem.displayName = "LightItem";
+
 interface LightListProps {
   scene: Scene;
   sceneIndex: number;
@@ -139,6 +141,7 @@ interface LightListProps {
   handleDeleteLight: (sceneIndex: number, lightIndex: number) => void;
   handleAddLight: (sceneIndex: number) => void;
   handleBulkAddLights?: (sceneIndex: number, lights: Light[]) => void;
+  handleBulkUpdateLights?: (sceneIndex: number, lights: Light[]) => void;
 }
 
 const LightList = memo<LightListProps>(
@@ -152,6 +155,7 @@ const LightList = memo<LightListProps>(
     handleDeleteLight,
     handleAddLight,
     handleBulkAddLights,
+    handleBulkUpdateLights,
   }) => {
     const onAmountChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -178,6 +182,16 @@ const LightList = memo<LightListProps>(
         }
       },
       [handleBulkAddLights, sceneIndex]
+    );
+
+    // This function handles bulk updates from the enhanced dialog
+    const handleBulkUpdate = useCallback(
+      (sceneIndex: number, updatedLights: Light[]) => {
+        if (handleBulkUpdateLights && updatedLights.length > 0) {
+          handleBulkUpdateLights(sceneIndex, updatedLights);
+        }
+      },
+      [handleBulkUpdateLights]
     );
 
     const isLargeList = scene.lights.length > 10;
@@ -232,7 +246,7 @@ const LightList = memo<LightListProps>(
               </div>
 
               {handleBulkAddLights && (
-                <div className="flex items-end">
+                <div className="flex items-end gap-2">
                   <ExcelImportDialog
                     sceneIndex={sceneIndex}
                     onImport={onImportLights}
@@ -245,13 +259,15 @@ const LightList = memo<LightListProps>(
               <Card>
                 <CardContent className="p-4 bg-[#f3f4f641]">
                   <div className="space-y-4">
-                    <LightListDialog
+                    <EnhancedLightDialog
                       lights={scene.lights}
                       sceneIndex={sceneIndex}
                       handleLightChange={handleLightChange}
                       handleLightNameChange={handleLightNameChange}
                       handleDeleteLight={handleDeleteLight}
                       handleAddLight={handleAddLight}
+                      handleBulkUpdate={handleBulkUpdate}
+                      handleBulkUpdateLights={handleBulkUpdateLights}
                     />
                     <div className="space-y-2">
                       {scene.lights.slice(0, 3).map((light, lightIndex) => (
@@ -307,6 +323,7 @@ const LightList = memo<LightListProps>(
     );
   }
 );
+
 LightList.displayName = "LightList";
 
 export default LightList;

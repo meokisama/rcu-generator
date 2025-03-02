@@ -272,6 +272,7 @@ interface SceneItemProps {
   handleAddLight: (sceneIndex: number) => void;
   canDelete: boolean;
   handleBulkAddLights?: (sceneIndex: number, lights: Light[]) => void;
+  handleBulkUpdateLights?: (sceneIndex: number, lights: Light[]) => void;
 }
 
 // Scene component for individual scene controls
@@ -291,6 +292,7 @@ const SceneItem = memo<SceneItemProps>(
     handleAddLight,
     canDelete,
     handleBulkAddLights,
+    handleBulkUpdateLights,
   }) => {
     const onNameChange = useCallback(
       (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -370,6 +372,7 @@ const SceneItem = memo<SceneItemProps>(
             handleDeleteLight={handleDeleteLight}
             handleAddLight={handleAddLight}
             handleBulkAddLights={handleBulkAddLights}
+            handleBulkUpdateLights={handleBulkUpdateLights}
           />
         </div>
       </div>
@@ -1136,6 +1139,30 @@ export default function Generator() {
     [scenes]
   );
 
+  const handleBulkUpdateLights = useCallback(
+    (sceneIndex: number, updatedLights: Light[]) => {
+      if (updatedLights.length === 0) return;
+
+      const updatedScene = {
+        ...scenes[sceneIndex],
+        lights: updatedLights,
+        amount: updatedLights.length,
+      };
+
+      dispatch({
+        type: "UPDATE_SCENE",
+        index: sceneIndex,
+        scene: updatedScene,
+      });
+
+      toast.success(`Đã cập nhật ${updatedLights.length} đèn thành công!`, {
+        description: "Các thay đổi đã được lưu vào Scene.",
+        duration: 6000,
+      });
+    },
+    [scenes]
+  );
+
   // Render scenes list memoized
   const renderScenes = useMemo(() => {
     return scenes.map((scene, sceneIndex) => (
@@ -1155,6 +1182,7 @@ export default function Generator() {
         handleAddLight={handleAddLight}
         canDelete={scenes.length > 1}
         handleBulkAddLights={handleBulkAddLights}
+        handleBulkUpdateLights={handleBulkUpdateLights}
       />
     ));
   }, [
@@ -1170,6 +1198,7 @@ export default function Generator() {
     handleDeleteLight,
     handleAddLight,
     handleBulkAddLights,
+    handleBulkUpdateLights,
   ]);
 
   // Render schedules list memoized
