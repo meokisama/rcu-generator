@@ -325,8 +325,8 @@ const SceneItem = memo<SceneItemProps>(
           </div>
         )}
         <div className="border p-4 rounded-lg shadow-sm relative bg-[#f3f4f641]">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex-1 mr-6 lg:mr-12 relative">
+          <div className="flex justify-between items-center mb-6 gap-2">
+            <div className="flex-1 relative">
               <PenLine className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
               <Input
                 value={scene.name}
@@ -495,8 +495,8 @@ const ScheduleItem = memo<ScheduleItemProps>(
           </div>
         )}
         <div className="border p-4 rounded-lg space-y-4 shadow-sm relative bg-[#f3f4f641]">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex-1 mr-6 lg:mr-12 relative">
+          <div className="flex justify-between items-center mb-6 gap-2">
+            <div className="flex-1 relative">
               <PenLine className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
               <Input
                 value={schedule.name}
@@ -535,7 +535,7 @@ const ScheduleItem = memo<ScheduleItemProps>(
           </div>
 
           <div className="space-y-2">
-            <Label>Chọn các Scene cho Schedule này:</Label>
+            <Label>Những ngữ cảnh sẽ chạy theo lịch trình này:</Label>
             <div className="grid grid-cols-2 gap-2 p-4 border rounded-lg bg-gray-50">
               {scenes.map((scene, i) => {
                 const onSceneSelectionChange = createSceneSelectionHandler(i);

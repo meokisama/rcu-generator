@@ -6,6 +6,7 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -401,16 +402,19 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
           </DialogTrigger>
         </div>
         <Separator />
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Chỉnh sửa danh sách đèn</DialogTitle>
+            <DialogDescription>
+              Chỉnh sửa chi tiết các đèn và ấn Lưu thay đổi để cập nhật.
+            </DialogDescription>
           </DialogHeader>
           <div className="flex-1 flex flex-col min-h-0 mt-4">
             <div className="mb-2 flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Label>Bảng dữ liệu đèn</Label>
                 <Badge variant="outline" className="bg-blue-50">
-                  {tableData.length} hàng
+                  {tableData.length} đèn
                 </Badge>
                 {validRowsCount !== tableData.length && (
                   <Badge variant="outline" className="bg-green-50">
@@ -438,11 +442,13 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12 py-2">#</TableHead>
-                      <TableHead className="w-2/5 py-2">Tên đèn</TableHead>
-                      <TableHead className="w-1/5 py-2">Group</TableHead>
-                      <TableHead className="py-2">Độ sáng (%)</TableHead>
-                      <TableHead className="w-12 py-2">Xóa</TableHead>
+                      <TableHead className="w-12 py-2 text-center">#</TableHead>
+                      <TableHead className="py-2">Tên đèn</TableHead>
+                      <TableHead className="w-2/12 py-2">Group</TableHead>
+                      <TableHead className="w-2/12 py-2">Độ sáng (%)</TableHead>
+                      <TableHead className="w-12 py-2 text-center">
+                        Xóa
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                 </Table>
@@ -461,11 +467,11 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
                             !isRowValid ? "bg-red-50 hover:bg-red-50" : ""
                           }
                         >
-                          <TableCell className="w-12 py-2">
+                          <TableCell className="w-12 py-2 text-center">
                             {index + 1}
                           </TableCell>
-                          <TableCell className="w-2/5 py-2 relative">
-                            <PenLine className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                          <TableCell className="py-2 relative">
+                            <PenLine className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                             <Input
                               value={row.name}
                               onChange={(e) =>
@@ -473,11 +479,11 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
                               }
                               onFocus={() => handleCellFocus(index, "name")}
                               placeholder="Tên đèn"
-                              className="h-8 pl-8"
+                              className="h-10 pl-8"
                             />
                           </TableCell>
-                          <TableCell className="w-1/5 py-2 relative">
-                            <Book className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                          <TableCell className="w-2/12 py-2 relative">
+                            <Book className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                             <Input
                               value={row.group}
                               onChange={(e) =>
@@ -486,15 +492,15 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
                               onFocus={() => handleCellFocus(index, "group")}
                               type="number"
                               min="1"
-                              className={`pl-8 h-8 ${
+                              className={`pl-8 h-10 ${
                                 !row.groupValid
                                   ? "border-red-500 focus:ring-red-500"
                                   : ""
                               }`}
                             />
                           </TableCell>
-                          <TableCell className="py-2 relative">
-                            <Sun className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                          <TableCell className="w-2/12 py-2 relative">
+                            <Sun className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                             <Input
                               value={row.value}
                               onChange={(e) =>
@@ -504,7 +510,7 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
                               type="number"
                               min="0"
                               max="100"
-                              className={`pl-8 h-8 ${
+                              className={`pl-8 h-10 ${
                                 !row.valueValid
                                   ? "border-red-500 focus:ring-red-500"
                                   : ""
@@ -517,7 +523,7 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
                               size="icon"
                               onClick={() => deleteRow(index)}
                               disabled={tableData.length <= 1}
-                              className="h-8 w-8"
+                              className="h-10 w-10"
                             >
                               <Trash2 className="h-4 w-4 text-red-500" />
                             </Button>
@@ -536,10 +542,9 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
             <AlertTitle>Lưu ý</AlertTitle>
             <AlertDescription>
               <p>
-                - Khi chỉnh sửa dữ liệu, bạn có thể copy dữ liệu từ Excel và dán
-                vào cột tương ứng.
+                Hỗ trợ chức năng dán dữ liệu từ Excel để cập nhật độ sáng đèn
+                nhanh chóng.
               </p>
-              <p>- Các ô có viền đỏ là không hợp lệ và sẽ bị bỏ qua khi lưu.</p>
             </AlertDescription>
           </Alert>
 

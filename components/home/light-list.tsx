@@ -233,7 +233,7 @@ const LightList = memo<LightListProps>(
           </div>
         ) : (
           <>
-            <div className="flex justify-between gap-4">
+            <div className="flex justify-between gap-2">
               <div className="flex-1">
                 <Label>Nhập số lượng đèn (nếu cần): </Label>
                 <Input

@@ -311,7 +311,7 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
           <span>Nhập từ Excel</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Nhập dữ liệu đèn từ Excel</DialogTitle>
           <DialogDescription>
@@ -323,7 +323,7 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
             <div className="flex items-center gap-2">
               <Label>Bảng dữ liệu đèn</Label>
               <Badge variant="outline" className="bg-blue-50">
-                {tableData.length} hàng
+                {tableData.length} đèn
               </Badge>
               {validRowsCount !== tableData.length && (
                 <Badge variant="outline" className="bg-green-50">
@@ -351,11 +351,11 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12 py-2">#</TableHead>
-                    <TableHead className="w-2/5 py-2">Tên đèn</TableHead>
-                    <TableHead className="w-1/5 py-2">Group</TableHead>
-                    <TableHead className="py-2">Độ sáng (%)</TableHead>
-                    <TableHead className="w-12 py-2">Xóa</TableHead>
+                    <TableHead className="w-12 py-2 text-center">#</TableHead>
+                    <TableHead className="py-2">Tên đèn</TableHead>
+                    <TableHead className="w-2/12 py-2">Group</TableHead>
+                    <TableHead className="w-2/12 py-2">Độ sáng (%)</TableHead>
+                    <TableHead className="w-12 py-2 text-center">Xóa</TableHead>
                   </TableRow>
                 </TableHeader>
               </Table>
@@ -374,9 +374,11 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
                           !isRowValid ? "bg-red-50 hover:bg-red-50" : ""
                         }
                       >
-                        <TableCell className="w-12 py-2">{index + 1}</TableCell>
-                        <TableCell className="w-2/5 py-2 relative">
-                          <PenLine className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                        <TableCell className="w-12 py-2 text-center">
+                          {index + 1}
+                        </TableCell>
+                        <TableCell className="py-2 relative">
+                          <PenLine className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                           <Input
                             value={row.name}
                             onChange={(e) =>
@@ -384,11 +386,11 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
                             }
                             onFocus={() => handleCellFocus(index, "name")}
                             placeholder="Tên đèn"
-                            className="h-8 pl-8"
+                            className="h-10 pl-8"
                           />
                         </TableCell>
-                        <TableCell className="w-1/5 py-2 relative">
-                          <Book className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                        <TableCell className="w-2/12 py-2 relative">
+                          <Book className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                           <Input
                             value={row.group}
                             onChange={(e) =>
@@ -397,15 +399,15 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
                             onFocus={() => handleCellFocus(index, "group")}
                             type="number"
                             min="1"
-                            className={`pl-8 h-8 ${
+                            className={`pl-8 h-10 ${
                               !row.groupValid
                                 ? "border-red-500 focus:ring-red-500"
                                 : ""
                             }`}
                           />
                         </TableCell>
-                        <TableCell className="py-2 relative">
-                          <Sun className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                        <TableCell className="w-2/12 py-2 relative">
+                          <Sun className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                           <Input
                             value={row.value}
                             onChange={(e) =>
@@ -415,7 +417,7 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
                             type="number"
                             min="0"
                             max="100"
-                            className={`pl-8 h-8 ${
+                            className={`pl-8 h-10 ${
                               !row.valueValid
                                 ? "border-red-500 focus:ring-red-500"
                                 : ""
@@ -428,7 +430,7 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
                             size="icon"
                             onClick={() => deleteRow(index)}
                             disabled={tableData.length <= 1}
-                            className="h-8 w-8"
+                            className="h-10 w-10"
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
