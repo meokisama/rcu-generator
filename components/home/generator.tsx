@@ -28,9 +28,17 @@ import {
   PenLine,
   RefreshCw,
   FileSpreadsheet,
+  Bolt,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Terminal } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -1490,33 +1498,43 @@ export default function Generator() {
                     <Suspense fallback={loadingFallback}>
                       <OverviewDialog {...overviewDialogProps} />
                     </Suspense>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleExportConfig}
-                      title="Xuất cấu hình hiện tại"
-                      className="flex items-center gap-1"
-                    >
-                      <Share className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleImportConfig}
-                      title="Nhập cấu hình từ file JSON"
-                      className="flex items-center gap-1"
-                    >
-                      <FolderOpen className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleImportCSV}
-                      title="Nhập dữ liệu từ file CSV"
-                      className="flex items-center gap-1"
-                    >
-                      <FileSpreadsheet className="h-4 w-4" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          title="Xuất/Nhập dữ liệu"
+                          className="flex items-center gap-1"
+                        >
+                          <Bolt className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={handleExportConfig}
+                          className="text-gray-700"
+                        >
+                          <Share className="h-4 w-4" />
+                          Xuất file làm việc (JSON)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={handleImportConfig}
+                          className="text-gray-700"
+                        >
+                          <FolderOpen className="h-4 w-4" />
+                          Nhập file làm việc (JSON)
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={handleImportCSV}
+                          className="text-gray-700"
+                        >
+                          <FileSpreadsheet className="h-4 w-4" />
+                          Nhập full dữ liệu (CSV)
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <Button
                       variant="outline"
                       size="icon"
