@@ -27,6 +27,7 @@ import {
   Trash2,
   PenLine,
   RefreshCw,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,40 +40,13 @@ import { cloneDeep } from "lodash";
 import { ErrorBoundary } from "react-error-boundary";
 import LightList from "./light-list";
 import Image from "next/image";
+import { parseCSV } from "@/lib/csv-parser";
 
 // Lazy loaded components
 const OverviewDialog = lazy(() => import("@/components/home/drag-dialog"));
 
-// Types
-interface Light {
-  group: number;
-  value: number;
-  name: string;
-}
-
-interface Scene {
-  name: string;
-  amount: number;
-  lights: Light[];
-  isSequential: boolean;
-  startGroup?: number;
-}
-
-interface Schedule {
-  name: string;
-  enable: boolean;
-  sceneAmount: number;
-  sceneGroup: number[];
-  monday: boolean;
-  tuesday: boolean;
-  wednesday: boolean;
-  thursday: boolean;
-  friday: boolean;
-  saturday: boolean;
-  sunday: boolean;
-  hour: number;
-  minute: number;
-}
+// Import types from app-types.ts
+import { Light, Scene, Schedule } from "@/types/app-types";
 
 // State interface
 interface State {
@@ -1197,6 +1171,82 @@ export default function Generator() {
     }
   }, []);
 
+  // Hàm nhập cấu hình từ file CSV
+  const handleImportCSV = useCallback(() => {
+    try {
+      // Tạo input element ẩn để chọn file
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".csv";
+
+      input.onchange = (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          // Hiển thị toast loading và lưu ID để có thể đóng sau này
+          const loadingToastId = toast.loading("Đang xử lý file CSV...");
+
+          try {
+            const content = event.target?.result as string;
+
+            // Sử dụng hàm parseCSV để chuyển đổi dữ liệu CSV thành scenes và schedules
+            const { scenes: parsedScenes, schedules: parsedSchedules } =
+              await parseCSV(content);
+
+            if (parsedScenes.length === 0) {
+              // Đóng toast loading
+              toast.dismiss(loadingToastId);
+              throw new Error("Không tìm thấy scene nào trong file CSV");
+            }
+
+            // Cập nhật state với dữ liệu từ file
+            dispatch({ type: "SET_SCENES", scenes: parsedScenes });
+
+            // Chỉ cập nhật schedules nếu có
+            if (parsedSchedules.length > 0) {
+              dispatch({ type: "SET_SCHEDULES", schedules: parsedSchedules });
+            }
+
+            // Đóng toast loading
+            toast.dismiss(loadingToastId);
+
+            toast.success("Nhập dữ liệu CSV thành công!", {
+              description: `Đã nhập ${parsedScenes.length} scene${
+                parsedSchedules.length > 0
+                  ? ` và ${parsedSchedules.length} schedule`
+                  : ""
+              } từ file CSV.`,
+              duration: 6000,
+            });
+          } catch (error) {
+            console.error("Lỗi khi đọc file CSV:", error);
+            // Đóng toast loading nếu chưa đóng
+            toast.dismiss(loadingToastId);
+
+            toast.error("Nhập dữ liệu CSV thất bại!", {
+              description:
+                "File CSV không hợp lệ hoặc không đúng định dạng. Vui lòng kiểm tra lại.",
+              duration: 6000,
+            });
+          }
+        };
+
+        reader.readAsText(file);
+      };
+
+      // Kích hoạt dialog chọn file
+      input.click();
+    } catch (error) {
+      console.error("Lỗi khi nhập dữ liệu CSV:", error);
+      toast.error("Nhập dữ liệu CSV thất bại!", {
+        description: "Đã xảy ra lỗi khi nhập dữ liệu CSV. Vui lòng thử lại.",
+        duration: 6000,
+      });
+    }
+  }, []);
+
   // Memoized CodeBlock props to prevent re-renders when unrelated state changes
   const codeBlockProps = useMemo(() => {
     return {
@@ -1453,10 +1503,19 @@ export default function Generator() {
                       variant="outline"
                       size="icon"
                       onClick={handleImportConfig}
-                      title="Nhập cấu hình từ file"
+                      title="Nhập cấu hình từ file JSON"
                       className="flex items-center gap-1"
                     >
                       <FolderOpen className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleImportCSV}
+                      title="Nhập dữ liệu từ file CSV"
+                      className="flex items-center gap-1"
+                    >
+                      <FileSpreadsheet className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
