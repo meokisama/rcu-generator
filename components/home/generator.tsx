@@ -21,7 +21,8 @@ import { Switch } from "@/components/ui/switch";
 import {
   Copy,
   Download,
-  Upload,
+  Share,
+  FolderOpen,
   Plus,
   Trash2,
   PenLine,
@@ -1441,21 +1442,21 @@ export default function Generator() {
                     </Suspense>
                     <Button
                       variant="outline"
+                      size="icon"
                       onClick={handleExportConfig}
-                      title="Lưu cấu hình hiện tại"
+                      title="Xuất cấu hình hiện tại"
                       className="flex items-center gap-1"
                     >
-                      <Download className="h-4 w-4" />
-                      <span className="hidden sm:inline">Xuất</span>
+                      <Share className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
+                      size="icon"
                       onClick={handleImportConfig}
                       title="Nhập cấu hình từ file"
                       className="flex items-center gap-1"
                     >
-                      <Upload className="h-4 w-4" />
-                      <span className="hidden sm:inline">Nhập</span>
+                      <FolderOpen className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
