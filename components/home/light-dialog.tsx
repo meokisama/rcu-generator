@@ -133,7 +133,13 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
     );
 
     const validateValue = useCallback((value: string): boolean => {
-      if (value === "") return false;
+      // Empty values are valid and will be converted to 100
+      if (value === "" || value.trim() === "") return true;
+
+      // Handle "on" as 100 and "off" as 0
+      if (value.trim().toLowerCase() === "on") return true;
+      if (value.trim().toLowerCase() === "off") return true;
+
       const cleanValue = value.replace("%", "");
       const numValue = parseInt(cleanValue);
       return !isNaN(numValue) && numValue >= 0 && numValue <= 100;
@@ -172,7 +178,20 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
             newData[rowIndex].groupValid = isValid;
           } else if (field === "value") {
             const isValid = validateValue(value);
-            newData[rowIndex].value = value.replace("%", "");
+
+            // Convert "on" to 100 and "off" to 0
+            let processedValue = value.replace("%", "");
+
+            // Handle empty value - set to 100
+            if (processedValue.trim() === "") {
+              processedValue = "100";
+            } else if (processedValue.trim().toLowerCase() === "on") {
+              processedValue = "100";
+            } else if (processedValue.trim().toLowerCase() === "off") {
+              processedValue = "0";
+            }
+
+            newData[rowIndex].value = processedValue;
             newData[rowIndex].valueValid = isValid;
           } else {
             newData[rowIndex].name = value;
@@ -220,7 +239,8 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
         const { row, col } = focusedCell;
         const clipboardData = e.clipboardData;
         const pastedData = clipboardData.getData("text");
-        const rows = pastedData.trim().split(/[\r\n]+/);
+        // Sử dụng split thông thường để giữ lại các dòng trống
+        const rows = pastedData.trim().split(/\r?\n/);
 
         if (rows.length > 1 || rows[0].includes("\t")) {
           setTableData((prevData) => {
@@ -256,10 +276,21 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
                   newData[currentRowIndex].group = extractedValue;
                   newData[currentRowIndex].groupValid = isValid;
                 } else if (colName === "value") {
-                  const cleanValue = cellValue.replace("%", "");
-                  newData[currentRowIndex].value = cleanValue;
+                  // Convert "on" to 100 and "off" to 0
+                  let processedValue = cellValue.replace("%", "");
+
+                  // Handle empty rows - set to 100
+                  if (processedValue.trim() === "") {
+                    processedValue = "100";
+                  } else if (processedValue.trim().toLowerCase() === "on") {
+                    processedValue = "100";
+                  } else if (processedValue.trim().toLowerCase() === "off") {
+                    processedValue = "0";
+                  }
+
+                  newData[currentRowIndex].value = processedValue;
                   newData[currentRowIndex].valueValid =
-                    validateValue(cleanValue);
+                    validateValue(processedValue);
                 }
               });
             });
@@ -317,7 +348,7 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
             // For name, use input if provided, otherwise use original or default
             name:
               row.name ||
-              (originalLight ? originalLight.name : `Đèn ${index + 1}`),
+              (originalLight ? originalLight.name : "Đèn chưa đặt tên"),
 
             // For group, use input if valid, otherwise use original or default
             group: row.groupValid
@@ -357,6 +388,34 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
         console.error(error);
       }
     }, [tableData, handleBulkUpdate, sceneIndex, lights]);
+
+    // Hàm xử lý MASTER ON - đặt tất cả độ sáng thành 100
+    const handleMasterOn = useCallback(() => {
+      setTableData((prevData) => {
+        const newData = prevData.map((row) => ({
+          ...row,
+          value: "100",
+          valueValid: true,
+        }));
+        return newData;
+      });
+      setHasChanges(true);
+      toast.success("Đã đặt tất cả độ sáng thành 100%");
+    }, []);
+
+    // Hàm xử lý MASTER OFF - đặt tất cả độ sáng thành 0
+    const handleMasterOff = useCallback(() => {
+      setTableData((prevData) => {
+        const newData = prevData.map((row) => ({
+          ...row,
+          value: "0",
+          valueValid: true,
+        }));
+        return newData;
+      });
+      setHasChanges(true);
+      toast.success("Đã đặt tất cả độ sáng thành 0%");
+    }, []);
 
     const handleClose = useCallback(() => {
       if (hasChanges) {
@@ -426,6 +485,22 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={handleMasterOn}
+                  className="flex items-center gap-1 text-gray-600"
+                >
+                  <Sun className="h-3 w-3" /> MASTER ON
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleMasterOff}
+                  className="flex items-center gap-1 text-gray-600"
+                >
+                  <Sun className="h-3 w-3" /> MASTER OFF
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={addRow}
                   className="flex items-center gap-1 text-gray-600"
                 >
@@ -442,8 +517,7 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-12 py-2 text-center">#</TableHead>
-                      <TableHead className="py-2">Tên đèn</TableHead>
+                      <TableHead className="py-2 pl-5">Tên đèn</TableHead>
                       <TableHead className="w-2/12 py-2">Group</TableHead>
                       <TableHead className="w-2/12 py-2">Độ sáng (%)</TableHead>
                       <TableHead className="w-12 py-2 text-center">
@@ -467,11 +541,8 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
                             !isRowValid ? "bg-red-50 hover:bg-red-50" : ""
                           }
                         >
-                          <TableCell className="w-12 py-2 text-center">
-                            {index + 1}
-                          </TableCell>
-                          <TableCell className="py-2 relative">
-                            <PenLine className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                          <TableCell className="py-2 relative pl-4">
+                            <PenLine className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                             <Input
                               value={row.name}
                               onChange={(e) =>
@@ -544,6 +615,11 @@ export const EnhancedLightDialog = React.memo<EnhancedLightDialogProps>(
               <p>
                 Hỗ trợ chức năng dán dữ liệu từ Excel để cập nhật độ sáng đèn
                 nhanh chóng.
+              </p>
+              <p className="mt-1">
+                Sử dụng <strong>MASTER ON</strong> để đặt tất cả độ sáng thành
+                100% và <strong>MASTER OFF</strong> để đặt tất cả độ sáng thành
+                0%.
               </p>
             </AlertDescription>
           </Alert>

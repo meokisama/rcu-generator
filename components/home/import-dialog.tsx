@@ -101,7 +101,12 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
   };
 
   const validateValue = (value: string): boolean => {
-    if (value === "") return false;
+    // Empty values are valid and will be converted to 100
+    if (value === "" || value.trim() === "") return true;
+
+    // Handle "on" as 100 and "off" as 0
+    if (value.trim().toLowerCase() === "on") return true;
+    if (value.trim().toLowerCase() === "off") return true;
 
     const cleanValue = value.replace("%", "");
     const numValue = parseInt(cleanValue);
@@ -143,7 +148,20 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
       newData[rowIndex].groupValid = isValid;
     } else if (field === "value") {
       const isValid = validateValue(value);
-      newData[rowIndex].value = value.replace("%", "");
+
+      // Convert "on" to 100 and "off" to 0
+      let processedValue = value.replace("%", "");
+
+      // Handle empty value - set to 100
+      if (processedValue.trim() === "") {
+        processedValue = "100";
+      } else if (processedValue.trim().toLowerCase() === "on") {
+        processedValue = "100";
+      } else if (processedValue.trim().toLowerCase() === "off") {
+        processedValue = "0";
+      }
+
+      newData[rowIndex].value = processedValue;
       newData[rowIndex].valueValid = isValid;
     } else {
       newData[rowIndex].name = value;
@@ -161,7 +179,8 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
     const { row, col } = focusedCell;
     const clipboardData = e.clipboardData;
     const pastedData = clipboardData.getData("text");
-    const rows = pastedData.trim().split(/[\r\n]+/);
+    // Sử dụng split thông thường để giữ lại các dòng trống
+    const rows = pastedData.trim().split(/\r?\n/);
 
     if (rows.length > 1 || rows[0].includes("\t")) {
       const newData = [...tableData];
@@ -196,9 +215,20 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
             newData[currentRowIndex].group = extractedValue;
             newData[currentRowIndex].groupValid = isValid;
           } else if (colName === "value") {
-            const cleanValue = cellValue.replace("%", "");
-            newData[currentRowIndex].value = cleanValue;
-            newData[currentRowIndex].valueValid = validateValue(cleanValue);
+            // Convert "on" to 100 and "off" to 0
+            let processedValue = cellValue.replace("%", "");
+
+            // Handle empty rows - set to 100
+            if (processedValue.trim() === "") {
+              processedValue = "100";
+            } else if (processedValue.trim().toLowerCase() === "on") {
+              processedValue = "100";
+            } else if (processedValue.trim().toLowerCase() === "off") {
+              processedValue = "0";
+            }
+
+            newData[currentRowIndex].value = processedValue;
+            newData[currentRowIndex].valueValid = validateValue(processedValue);
           }
         });
       });
@@ -256,8 +286,8 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
         return;
       }
 
-      const newLights: Light[] = validRows.map((row, index) => ({
-        name: row.name || `Đèn ${index + 1}`,
+      const newLights: Light[] = validRows.map((row) => ({
+        name: row.name || "Đèn chưa đặt tên",
         group: parseInt(row.group) || 1,
         value: parseInt(row.value) || 100,
       }));
@@ -351,8 +381,7 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12 py-2 text-center">#</TableHead>
-                    <TableHead className="py-2">Tên đèn</TableHead>
+                    <TableHead className="py-2 pl-5">Tên đèn</TableHead>
                     <TableHead className="w-2/12 py-2">Group</TableHead>
                     <TableHead className="w-2/12 py-2">Độ sáng (%)</TableHead>
                     <TableHead className="w-12 py-2 text-center">Xóa</TableHead>
@@ -374,11 +403,8 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({ onImport }) => {
                           !isRowValid ? "bg-red-50 hover:bg-red-50" : ""
                         }
                       >
-                        <TableCell className="w-12 py-2 text-center">
-                          {index + 1}
-                        </TableCell>
-                        <TableCell className="py-2 relative">
-                          <PenLine className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                        <TableCell className="py-2 relative pl-4">
+                          <PenLine className="absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
                           <Input
                             value={row.name}
                             onChange={(e) =>

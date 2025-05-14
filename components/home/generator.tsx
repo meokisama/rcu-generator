@@ -18,7 +18,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Copy, Download, Plus, Trash2, PenLine, RefreshCw } from "lucide-react";
+import {
+  Copy,
+  Download,
+  Upload,
+  Plus,
+  Trash2,
+  PenLine,
+  RefreshCw,
+} from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -742,11 +750,10 @@ export default function Generator() {
         if (amount > scene.lights.length) {
           // Add new lights
           while (updatedLights.length < amount) {
-            const newIndex = updatedLights.length + 1;
             updatedLights.push({
               group: 1,
               value: 100,
-              name: `Đèn ${newIndex}`,
+              name: "Đèn chưa đặt tên",
             });
           }
         } else {
@@ -774,7 +781,7 @@ export default function Generator() {
         updates = {
           ...updates,
           startGroup: 1,
-          lights: [{ group: 1, value: 100, name: "Đèn 1" }],
+          lights: [{ group: 1, value: 100, name: "Đèn chưa đặt tên" }],
         };
       }
 
@@ -825,25 +832,21 @@ export default function Generator() {
     []
   );
 
-  const handleAddLight = useCallback(
-    (sceneIndex: number) => {
-      const newLightIndex = scenes[sceneIndex].lights.length + 1;
-      dispatch({
-        type: "ADD_LIGHT",
-        sceneIndex,
-        light: {
-          group: 1,
-          value: 100,
-          name: `Đèn ${newLightIndex}`,
-        },
-      });
-      toast.success("Thêm line đèn thành công!", {
-        description: "Line đèn mới đã được thêm vào danh sách.",
-        duration: 6000,
-      });
-    },
-    [scenes]
-  );
+  const handleAddLight = useCallback((sceneIndex: number) => {
+    dispatch({
+      type: "ADD_LIGHT",
+      sceneIndex,
+      light: {
+        group: 1,
+        value: 100,
+        name: "Đèn chưa đặt tên",
+      },
+    });
+    toast.success("Thêm line đèn thành công!", {
+      description: "Line đèn mới đã được thêm vào danh sách.",
+      duration: 6000,
+    });
+  }, []);
 
   const handleDeleteLight = useCallback(
     (sceneIndex: number, lightIndex: number) => {
@@ -923,7 +926,7 @@ export default function Generator() {
       scene: {
         name: `Scene ${scenes.length + 1}`,
         amount: 1,
-        lights: [{ group: 1, value: 100, name: "Đèn 1" }],
+        lights: [{ group: 1, value: 100, name: "Đèn chưa đặt tên" }],
         isSequential: false,
       },
     });
@@ -1093,6 +1096,105 @@ export default function Generator() {
       duration: 8000,
     });
   }, [generateOptimizedSceneCode, generateScheduleCode, scenes]);
+
+  // Hàm xuất cấu hình hiện tại ra file JSON
+  const handleExportConfig = useCallback(() => {
+    try {
+      const config = {
+        scenes,
+        schedules,
+        version: "1.0.0", // Thêm version để kiểm tra tương thích khi import
+      };
+
+      const configJson = JSON.stringify(config, null, 2);
+      const blob = new Blob([configJson], { type: "application/json" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+
+      // Tạo tên file với timestamp để dễ phân biệt
+      const date = new Date();
+      const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1)
+        .toString()
+        .padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}_${date
+        .getHours()
+        .toString()
+        .padStart(2, "0")}-${date.getMinutes().toString().padStart(2, "0")}`;
+      a.download = `rcu-config_${formattedDate}.json`;
+
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast.success("Xuất cấu hình thành công!", {
+        description:
+          "Cấu hình hiện tại đã được lưu thành file JSON. Bạn có thể import lại file này để tiếp tục làm việc.",
+        duration: 6000,
+      });
+    } catch (error) {
+      console.error("Lỗi khi xuất cấu hình:", error);
+      toast.error("Xuất cấu hình thất bại!", {
+        description: "Đã xảy ra lỗi khi xuất cấu hình. Vui lòng thử lại.",
+        duration: 6000,
+      });
+    }
+  }, [scenes, schedules]);
+
+  // Hàm nhập cấu hình từ file JSON
+  const handleImportConfig = useCallback(() => {
+    try {
+      // Tạo input element ẩn để chọn file
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".json";
+
+      input.onchange = (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const content = event.target?.result as string;
+            const config = JSON.parse(content);
+
+            // Kiểm tra tính hợp lệ của file cấu hình
+            if (!config.scenes || !config.schedules) {
+              throw new Error("File cấu hình không hợp lệ");
+            }
+
+            // Cập nhật state với dữ liệu từ file
+            dispatch({ type: "SET_SCENES", scenes: config.scenes });
+            dispatch({ type: "SET_SCHEDULES", schedules: config.schedules });
+
+            toast.success("Nhập cấu hình thành công!", {
+              description: `Đã nhập ${config.scenes.length} scene và ${config.schedules.length} schedule từ file cấu hình.`,
+              duration: 6000,
+            });
+          } catch (error) {
+            console.error("Lỗi khi đọc file cấu hình:", error);
+            toast.error("Nhập cấu hình thất bại!", {
+              description:
+                "File cấu hình không hợp lệ hoặc bị hỏng. Vui lòng kiểm tra lại.",
+              duration: 6000,
+            });
+          }
+        };
+
+        reader.readAsText(file);
+      };
+
+      // Kích hoạt dialog chọn file
+      input.click();
+    } catch (error) {
+      console.error("Lỗi khi nhập cấu hình:", error);
+      toast.error("Nhập cấu hình thất bại!", {
+        description: "Đã xảy ra lỗi khi nhập cấu hình. Vui lòng thử lại.",
+        duration: 6000,
+      });
+    }
+  }, []);
 
   // Memoized CodeBlock props to prevent re-renders when unrelated state changes
   const codeBlockProps = useMemo(() => {
@@ -1339,8 +1441,27 @@ export default function Generator() {
                     </Suspense>
                     <Button
                       variant="outline"
+                      onClick={handleExportConfig}
+                      title="Lưu cấu hình hiện tại"
+                      className="flex items-center gap-1"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span className="hidden sm:inline">Xuất</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleImportConfig}
+                      title="Nhập cấu hình từ file"
+                      className="flex items-center gap-1"
+                    >
+                      <Upload className="h-4 w-4" />
+                      <span className="hidden sm:inline">Nhập</span>
+                    </Button>
+                    <Button
+                      variant="outline"
                       size="icon"
                       onClick={handleRefresh}
+                      title="Làm mới code"
                     >
                       <RefreshCw className="h-4 w-4" />
                     </Button>
@@ -1348,6 +1469,7 @@ export default function Generator() {
                       variant="outline"
                       size="icon"
                       onClick={handleDownload}
+                      title="Tải xuống code"
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -1373,6 +1495,12 @@ export default function Generator() {
                       - Sau khi thêm scene & schedule xong xuôi toàn bộ, nhấn{" "}
                       <strong className="text-red-600">Download</strong> và gửi
                       file này cho anh Hoài An là được.
+                    </p>
+                    <p>
+                      - Sử dụng <strong className="text-blue-600">Xuất</strong>{" "}
+                      để lưu lại toàn bộ công việc đang làm và{" "}
+                      <strong className="text-blue-600">Nhập</strong> để nhập
+                      lại việc đã lưu trước đó.
                     </p>
                   </AlertDescription>
                 </Alert>
