@@ -163,7 +163,7 @@ function processCSVData(rows: any[]): {
     }
 
     // Lấy số group
-    const groupMatch = row[groupColumn].toString().match(/GROUP\s+(\d+)/i);
+    const groupMatch = row[groupColumn].toString().match(/GROUP\s*(\d+)/i);
     if (!groupMatch) {
       continue;
     }
