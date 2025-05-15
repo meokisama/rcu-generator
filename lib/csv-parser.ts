@@ -139,9 +139,9 @@ function processCSVData(rows: any[]): {
     [key: number]: { name: string; values: { [key: string]: number } };
   } = {};
 
-  // Lưu trữ đèn OPEN và CLOSE riêng biệt
-  const openCloseLights: {
-    [key: string]: { group: number; name: string; value: number }[];
+  // Lưu trữ đèn OPEN và CLOSE theo số
+  const openCloseLightsByNumber: {
+    [key: string]: { open: Light[]; close: Light[] };
   } = {};
 
   // Lưu trữ danh sách các group đèn OPEN/CLOSE để loại bỏ khỏi scene thông thường
@@ -273,21 +273,29 @@ function processCSVData(rows: any[]): {
 
     // Xử lý đèn OPEN/CLOSE
     if ((isOpenLight || isCloseLight) && openCloseNumber) {
-      const sceneKey = isOpenLight
-        ? `OPEN ${openCloseNumber}`
-        : `CLOSE ${openCloseNumber}`;
+      // Tạo key dựa trên số của đèn OPEN/CLOSE
+      const numberKey = openCloseNumber;
 
-      // Tạo scene OPEN/CLOSE nếu chưa tồn tại
-      if (!openCloseLights[sceneKey]) {
-        openCloseLights[sceneKey] = [];
+      // Khởi tạo cấu trúc lưu trữ nếu chưa tồn tại
+      if (!openCloseLightsByNumber[numberKey]) {
+        openCloseLightsByNumber[numberKey] = {
+          open: [],
+          close: [],
+        };
       }
 
-      // Thêm đèn vào scene OPEN/CLOSE tương ứng
-      openCloseLights[sceneKey].push({
-        name: lightName, // Giữ nguyên tên đèn OPEN/CLOSE
+      // Thêm đèn vào danh sách tương ứng (open hoặc close)
+      const light: Light = {
+        name: lightName,
         group: groupNumber,
-        value: 100, // Mặc định là 100% cho các đèn OPEN/CLOSE
-      });
+        value: 100, // Giá trị mặc định, sẽ được điều chỉnh khi tạo scene
+      };
+
+      if (isOpenLight) {
+        openCloseLightsByNumber[numberKey].open.push(light);
+      } else {
+        openCloseLightsByNumber[numberKey].close.push(light);
+      }
 
       // Thêm group vào danh sách các group đèn OPEN/CLOSE
       openCloseGroups.add(groupNumber);
@@ -334,8 +342,12 @@ function processCSVData(rows: any[]): {
     scenes[sceneIndex].amount = lights.length;
   });
 
-  // Lưu trữ tên các scene OPEN/CLOSE để kiểm tra trùng lặp
-  const openCloseSceneNames = new Set<string>(Object.keys(openCloseLights));
+  // Tạo danh sách tên các scene OPEN/CLOSE để kiểm tra trùng lặp
+  const openCloseSceneNames = new Set<string>();
+  Object.keys(openCloseLightsByNumber).forEach((number) => {
+    openCloseSceneNames.add(`OPEN ${number}`);
+    openCloseSceneNames.add(`CLOSE ${number}`);
+  });
 
   // Kiểm tra xem có scene MASTER ON/OFF không
   const masterOnOffIndex = sceneNames.findIndex(
@@ -416,16 +428,67 @@ function processCSVData(rows: any[]): {
   });
 
   // Tạo các scene OPEN/CLOSE
-  Object.entries(openCloseLights).forEach(([sceneName, lights]) => {
-    if (lights.length > 0) {
-      // Sắp xếp đèn theo group
-      lights.sort((a, b) => a.group - b.group);
+  Object.entries(openCloseLightsByNumber).forEach(([number, lightsObj]) => {
+    // Tạo danh sách đèn cho scene OPEN
+    const openSceneLights: Light[] = [];
 
-      // Thêm scene mới
+    // Thêm đèn OPEN với độ sáng 100%
+    lightsObj.open.forEach((light) => {
+      openSceneLights.push({
+        ...light,
+        value: 100, // Đèn OPEN sáng 100% trong scene OPEN
+      });
+    });
+
+    // Thêm đèn CLOSE với độ sáng 0%
+    lightsObj.close.forEach((light) => {
+      openSceneLights.push({
+        ...light,
+        value: 0, // Đèn CLOSE tắt (0%) trong scene OPEN
+      });
+    });
+
+    // Sắp xếp đèn theo group
+    openSceneLights.sort((a, b) => a.group - b.group);
+
+    // Thêm scene OPEN mới
+    if (openSceneLights.length > 0) {
       scenes.push({
-        name: sceneName,
-        amount: lights.length,
-        lights,
+        name: `OPEN ${number}`,
+        amount: openSceneLights.length,
+        lights: openSceneLights,
+        isSequential: false,
+      });
+    }
+
+    // Tạo danh sách đèn cho scene CLOSE
+    const closeSceneLights: Light[] = [];
+
+    // Thêm đèn OPEN với độ sáng 0%
+    lightsObj.open.forEach((light) => {
+      closeSceneLights.push({
+        ...light,
+        value: 0, // Đèn OPEN tắt (0%) trong scene CLOSE
+      });
+    });
+
+    // Thêm đèn CLOSE với độ sáng 100%
+    lightsObj.close.forEach((light) => {
+      closeSceneLights.push({
+        ...light,
+        value: 100, // Đèn CLOSE sáng 100% trong scene CLOSE
+      });
+    });
+
+    // Sắp xếp đèn theo group
+    closeSceneLights.sort((a, b) => a.group - b.group);
+
+    // Thêm scene CLOSE mới
+    if (closeSceneLights.length > 0) {
+      scenes.push({
+        name: `CLOSE ${number}`,
+        amount: closeSceneLights.length,
+        lights: closeSceneLights,
         isSequential: false,
       });
     }

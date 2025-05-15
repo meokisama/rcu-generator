@@ -1512,7 +1512,7 @@ export default function Generator() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
                           onClick={handleExportConfig}
-                          className="text-gray-700"
+                          className="text-gray-700 cursor-pointer"
                         >
                           <Share className="h-4 w-4" />
                           Xuất file làm việc (JSON)
@@ -1520,7 +1520,7 @@ export default function Generator() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={handleImportConfig}
-                          className="text-gray-700"
+                          className="text-gray-700 cursor-pointer"
                         >
                           <FolderOpen className="h-4 w-4" />
                           Nhập file làm việc (JSON)
@@ -1528,7 +1528,7 @@ export default function Generator() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={handleImportCSV}
-                          className="text-gray-700"
+                          className="text-gray-700 cursor-pointer"
                         >
                           <FileSpreadsheet className="h-4 w-4" />
                           Nhập full dữ liệu (CSV)
@@ -1575,10 +1575,15 @@ export default function Generator() {
                       file này cho anh Hoài An là được.
                     </p>
                     <p>
-                      - Sử dụng <strong className="text-blue-600">Xuất</strong>{" "}
+                      - Sử dụng <strong className="text-red-600">Xuất</strong>{" "}
                       để lưu lại toàn bộ công việc đang làm và{" "}
-                      <strong className="text-blue-600">Nhập</strong> để nhập
-                      lại việc đã lưu trước đó.
+                      <strong className="text-red-600">Nhập</strong> để nhập lại
+                      việc đã lưu trước đó.
+                    </p>
+                    <p>
+                      - Có thể chuyển file excel thành CSV và dùng chức năng
+                      <strong className="text-blue-800"> Nhập CSV</strong> để
+                      import toàn bộ dữ liệu thay vì nhập tay.
                     </p>
                   </AlertDescription>
                 </Alert>

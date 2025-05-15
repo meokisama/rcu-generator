@@ -268,14 +268,29 @@ const OverviewDialog: React.FC<OverviewDialogProps> = ({
           ) : (
             <p>
               - Với các group:{" "}
-              {scene.lights.map((light, i) => (
-                <React.Fragment key={i}>
-                  <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm mr-1">
-                    {light.group}
+              {scene.lights.length > 20 ? (
+                <>
+                  {scene.lights.slice(0, 20).map((light, i) => (
+                    <React.Fragment key={i}>
+                      <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm mr-1">
+                        {light.group}
+                      </span>{" "}
+                    </React.Fragment>
+                  ))}
+                  <span className="text-gray-500">
+                    ... và {scene.lights.length - 20} group khác.
                   </span>
-                  {i < scene.lights.length - 1 && " "}
-                </React.Fragment>
-              ))}
+                </>
+              ) : (
+                scene.lights.map((light, i) => (
+                  <React.Fragment key={i}>
+                    <span className="bg-slate-200 px-2 py-1 text-gray-500 rounded-sm mr-1">
+                      {light.group}
+                    </span>
+                    {i < scene.lights.length - 1 && " "}
+                  </React.Fragment>
+                ))
+              )}
             </p>
           )}
         </div>
