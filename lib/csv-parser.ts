@@ -457,28 +457,21 @@ function processCSVData(rows: any[]): {
     scene.lights = lights;
     scene.amount = lights.length;
 
-    // Kiểm tra xem scene có phải là MASTER scene không (ngoài MASTER ON/OFF)
-    if (
-      scene.name.toUpperCase().includes("MASTER") &&
-      scene.name !== "MASTER ON" &&
-      scene.name !== "MASTER OFF"
-    ) {
-      // Kiểm tra xem các group có liên tục không và tất cả đèn có cùng độ sáng không
-      const isGroupContinuous = checkContinuousGroups(lights);
+    // Kiểm tra xem các group có liên tục không và tất cả đèn có cùng độ sáng không
+    const isGroupContinuous = checkContinuousGroups(lights);
 
-      if (isGroupContinuous && lights.length > 0) {
-        // Nếu các group liên tục và tất cả đèn có cùng độ sáng, sử dụng mode group liên tục
-        const minGroup = Math.min(...lights.map((light) => light.group));
-        scene.isSequential = true;
-        scene.startGroup = minGroup;
-        scene.lights = [
-          {
-            name: "Đèn chưa đặt tên",
-            group: minGroup,
-            value: lights[0].value,
-          },
-        ];
-      }
+    if (isGroupContinuous && lights.length > 0) {
+      // Nếu các group liên tục và tất cả đèn có cùng độ sáng, sử dụng mode group liên tục
+      const minGroup = Math.min(...lights.map((light) => light.group));
+      scene.isSequential = true;
+      scene.startGroup = minGroup;
+      scene.lights = [
+        {
+          name: "Đèn chưa đặt tên",
+          group: minGroup,
+          value: lights[0].value,
+        },
+      ];
     }
   });
 
