@@ -623,6 +623,13 @@ export default function Generator() {
           indices.push(expandedIndex++);
         }
         sceneIndexMap.set(originalIndex + 1, indices);
+      } else if (scene.isSequential && scene.amount > 60) {
+        const parts = Math.ceil(scene.amount / 60);
+        const indices = [];
+        for (let i = 0; i < parts; i++) {
+          indices.push(expandedIndex++);
+        }
+        sceneIndexMap.set(originalIndex + 1, indices);
       } else {
         sceneIndexMap.set(originalIndex + 1, [expandedIndex++]);
       }
@@ -975,6 +982,7 @@ export default function Generator() {
   }, []);
 
   const splitSceneForCodeGeneration = (scene: Scene): Scene[] => {
+    // For non-sequential scenes, split by lights
     if (!scene.isSequential && scene.lights.length > 60) {
       const numberOfScenes = Math.ceil(scene.lights.length / 60);
       const result: Scene[] = [];
@@ -989,6 +997,27 @@ export default function Generator() {
           name: i === 0 ? scene.name : `${scene.name} (phần ${i + 1})`,
           amount: sceneLights.length,
           lights: sceneLights,
+        });
+      }
+
+      return result;
+    }
+    // For sequential scenes, split by amount
+    else if (scene.isSequential && scene.amount > 60) {
+      const numberOfScenes = Math.ceil(scene.amount / 60);
+      const result: Scene[] = [];
+
+      for (let i = 0; i < numberOfScenes; i++) {
+        const lightCount = i < numberOfScenes - 1 ? 60 : scene.amount - i * 60;
+        const startGroup = (scene.startGroup || 1) + i * 60;
+
+        result.push({
+          ...scene,
+          name: i === 0 ? scene.name : `${scene.name} (phần ${i + 1})`,
+          amount: lightCount,
+          startGroup: startGroup,
+          // Keep the same light settings for all parts
+          lights: scene.lights,
         });
       }
 
@@ -1039,7 +1068,9 @@ export default function Generator() {
     const scheduleCode = generateScheduleCode();
 
     const scenesWithManyLights = scenes.filter(
-      (scene) => !scene.isSequential && scene.lights.length > 60
+      (scene) =>
+        (!scene.isSequential && scene.lights.length > 60) ||
+        (scene.isSequential && scene.amount > 60)
     );
 
     const fullCode = `// Scene Configuration\n${sceneCode}\n// Schedule Configuration\n${scheduleCode}`;
@@ -1052,13 +1083,16 @@ export default function Generator() {
         .join(", ");
       const totalScenesAfterSplit =
         scenes.length +
-        scenesWithManyLights.reduce(
-          (acc, scene) => acc + Math.ceil(scene.lights.length / 60) - 1,
-          0
-        );
+        scenesWithManyLights.reduce((acc, scene) => {
+          if (scene.isSequential) {
+            return acc + Math.ceil(scene.amount / 60) - 1;
+          } else {
+            return acc + Math.ceil(scene.lights.length / 60) - 1;
+          }
+        }, 0);
 
       toast.info("Một số scene đã được tách khi tạo code!", {
-        description: `${sceneNames} có nhiều hơn 60 đèn và đã được tách thành nhiều scene trong code. Tổng số scene trong code: ${totalScenesAfterSplit}.`,
+        description: `${sceneNames} có nhiều hơn 60 đèn/group và đã được tách thành nhiều scene trong code. Tổng số scene trong code: ${totalScenesAfterSplit}.`,
         duration: 8000,
       });
     }

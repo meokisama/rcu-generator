@@ -3,6 +3,37 @@ import csvParser from "csv-parser";
 import { Readable } from "stream";
 
 /**
+ * Kiểm tra xem các group có liên tục không và tất cả đèn có cùng độ sáng không
+ * @param lights Danh sách đèn cần kiểm tra
+ * @returns true nếu các group liên tục và tất cả đèn có cùng độ sáng, false nếu không
+ */
+function checkContinuousGroups(lights: Light[]): boolean {
+  if (lights.length <= 1) return true;
+
+  // Sắp xếp đèn theo group
+  const sortedLights = [...lights].sort((a, b) => a.group - b.group);
+
+  // Kiểm tra xem tất cả đèn có cùng độ sáng không
+  const firstValue = sortedLights[0].value;
+  const allSameBrightness = sortedLights.every(
+    (light) => light.value === firstValue
+  );
+
+  if (!allSameBrightness) {
+    return false;
+  }
+
+  // Kiểm tra xem các group có liên tục không
+  for (let i = 1; i < sortedLights.length; i++) {
+    if (sortedLights[i].group !== sortedLights[i - 1].group + 1) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
  * Parse CSV content and convert it to scenes and schedules
  * @param csvContent The CSV file content as string
  * @returns Object containing scenes and schedules
@@ -425,7 +456,100 @@ function processCSVData(rows: any[]): {
     // Cập nhật scene
     scene.lights = lights;
     scene.amount = lights.length;
+
+    // Kiểm tra xem scene có phải là MASTER scene không (ngoài MASTER ON/OFF)
+    if (
+      scene.name.toUpperCase().includes("MASTER") &&
+      scene.name !== "MASTER ON" &&
+      scene.name !== "MASTER OFF"
+    ) {
+      // Kiểm tra xem các group có liên tục không và tất cả đèn có cùng độ sáng không
+      const isGroupContinuous = checkContinuousGroups(lights);
+
+      if (isGroupContinuous && lights.length > 0) {
+        // Nếu các group liên tục và tất cả đèn có cùng độ sáng, sử dụng mode group liên tục
+        const minGroup = Math.min(...lights.map((light) => light.group));
+        scene.isSequential = true;
+        scene.startGroup = minGroup;
+        scene.lights = [
+          {
+            name: "Đèn chưa đặt tên",
+            group: minGroup,
+            value: lights[0].value,
+          },
+        ];
+      }
+    }
   });
+
+  // Nếu có scene MASTER ON/OFF, tạo hai scene MASTER ON và MASTER OFF
+  if (masterOnOffIndex !== -1) {
+    // Tạo scene MASTER ON
+    if (allLights.length > 0) {
+      const masterOnLights = allLights.map((light) => ({
+        ...light,
+        value: 100, // Tất cả đèn có độ sáng 100%
+      }));
+
+      // Kiểm tra xem các group có liên tục không
+      const isGroupContinuous = checkContinuousGroups(masterOnLights);
+
+      if (isGroupContinuous) {
+        // Nếu các group liên tục, sử dụng mode group liên tục
+        const minGroup = Math.min(
+          ...masterOnLights.map((light) => light.group)
+        );
+        scenes.push({
+          name: "MASTER ON",
+          amount: masterOnLights.length,
+          lights: [{ name: "Đèn chưa đặt tên", group: minGroup, value: 100 }],
+          isSequential: true,
+          startGroup: minGroup,
+        });
+      } else {
+        // Nếu các group không liên tục, sử dụng mode thông thường
+        scenes.push({
+          name: "MASTER ON",
+          amount: masterOnLights.length,
+          lights: masterOnLights,
+          isSequential: false,
+        });
+      }
+    }
+
+    // Tạo scene MASTER OFF
+    if (allLights.length > 0) {
+      const masterOffLights = allLights.map((light) => ({
+        ...light,
+        value: 0, // Tất cả đèn có độ sáng 0%
+      }));
+
+      // Kiểm tra xem các group có liên tục không
+      const isGroupContinuous = checkContinuousGroups(masterOffLights);
+
+      if (isGroupContinuous) {
+        // Nếu các group liên tục, sử dụng mode group liên tục
+        const minGroup = Math.min(
+          ...masterOffLights.map((light) => light.group)
+        );
+        scenes.push({
+          name: "MASTER OFF",
+          amount: masterOffLights.length,
+          lights: [{ name: "Đèn chưa đặt tên", group: minGroup, value: 0 }],
+          isSequential: true,
+          startGroup: minGroup,
+        });
+      } else {
+        // Nếu các group không liên tục, sử dụng mode thông thường
+        scenes.push({
+          name: "MASTER OFF",
+          amount: masterOffLights.length,
+          lights: masterOffLights,
+          isSequential: false,
+        });
+      }
+    }
+  }
 
   // Tạo các scene OPEN/CLOSE
   Object.entries(openCloseLightsByNumber).forEach(([number, lightsObj]) => {
@@ -493,39 +617,6 @@ function processCSVData(rows: any[]): {
       });
     }
   });
-
-  // Nếu có scene MASTER ON/OFF, tạo hai scene MASTER ON và MASTER OFF
-  if (masterOnOffIndex !== -1) {
-    // Tạo scene MASTER ON
-    if (allLights.length > 0) {
-      const masterOnLights = allLights.map((light) => ({
-        ...light,
-        value: 100, // Tất cả đèn có độ sáng 100%
-      }));
-
-      scenes.push({
-        name: "MASTER ON",
-        amount: masterOnLights.length,
-        lights: masterOnLights,
-        isSequential: false,
-      });
-    }
-
-    // Tạo scene MASTER OFF
-    if (allLights.length > 0) {
-      const masterOffLights = allLights.map((light) => ({
-        ...light,
-        value: 0, // Tất cả đèn có độ sáng 0%
-      }));
-
-      scenes.push({
-        name: "MASTER OFF",
-        amount: masterOffLights.length,
-        lights: masterOffLights,
-        isSequential: false,
-      });
-    }
-  }
 
   // Tạo schedules cho DAY TIME, NIGHT TIME, và LATE TIME nếu có
   const schedules: Schedule[] = [];
