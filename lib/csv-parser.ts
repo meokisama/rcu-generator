@@ -434,12 +434,27 @@ function processLightData(
       // Kiểm tra xem group có trùng lặp không
       const isDuplicateGroup = groupCounts[groupNumber] > 1;
 
-      // Lưu thông tin đèn thông thường theo group (không phải OPEN/CLOSE)
-      lightsByGroup[groupNumber] = {
-        // Nếu group trùng lặp, sử dụng tên group, ngược lại sử dụng tên đèn gốc
-        name: isDuplicateGroup ? groupName : lightName,
-        values: sceneValues,
-      };
+      // Kiểm tra xem đèn này có giá trị độ sáng không
+      const hasAnyBrightnessValue = Object.values(sceneValues).some(
+        (value) => value !== 100 // Nếu khác 100 (giá trị mặc định), tức là có giá trị độ sáng
+      );
+
+      // Kiểm tra xem đã có đèn với group này chưa
+      const existingLight = lightsByGroup[groupNumber];
+
+      // Nếu chưa có đèn với group này, hoặc đèn mới có giá trị độ sáng và đèn cũ không có
+      if (
+        !existingLight ||
+        (hasAnyBrightnessValue &&
+          !Object.values(existingLight.values).some((value) => value !== 100))
+      ) {
+        // Lưu thông tin đèn thông thường theo group (không phải OPEN/CLOSE)
+        lightsByGroup[groupNumber] = {
+          // Nếu group trùng lặp, sử dụng tên group, ngược lại sử dụng tên đèn gốc
+          name: isDuplicateGroup ? groupName : lightName,
+          values: sceneValues,
+        };
+      }
     }
   }
 
