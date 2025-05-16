@@ -28,7 +28,6 @@ interface CSVRow {
 // Common scene processing result type
 interface SceneProcessingResult {
   scenes: Scene[];
-  sceneTimeInfo: SceneTimeInfo;
 }
 
 /**
@@ -114,7 +113,6 @@ function convertBrightnessValue(
 }
 
 // Cached regular expressions
-const TIME_REGEX = /(\d+):(\d+)/;
 const SCENE_HEADER_KEYWORDS = ["SCENE SETTING", "SCENE OVERIDE"];
 
 /**
@@ -161,10 +159,8 @@ function findSceneHeaderAndNames(
   // Tìm các cột chứa tên scene
   const sceneColumns: { [key: string]: number } = {};
   const sceneNames: string[] = [];
-  const sceneTimeInfo: SceneTimeInfo = {};
+  const sceneTimeInfo: SceneTimeInfo = {}; // Giữ lại để tương thích với interface
   const sceneNameRow_data = rows[sceneNameRow];
-  const hasNextRow = sceneNameRow + 1 < rows.length;
-  const nextRow = hasNextRow ? rows[sceneNameRow + 1] : null;
 
   // Xử lý từng cột trong hàng chứa tên scene
   Object.entries(sceneNameRow_data).forEach(([key, value]) => {
@@ -182,25 +178,6 @@ function findSceneHeaderAndNames(
         const colIndex = parseInt(key);
         sceneColumns[trimmedValue] = colIndex;
         sceneNames.push(trimmedValue);
-
-        // Kiểm tra dòng tiếp theo để lấy thông tin thời gian
-        if (hasNextRow && nextRow) {
-          const timeValue = nextRow[colIndex];
-
-          if (timeValue && typeof timeValue === "string") {
-            // Tìm kiếm định dạng thời gian (ví dụ: "6:00", "18:00")
-            const timeMatch = timeValue.match(TIME_REGEX);
-
-            if (timeMatch) {
-              const hour = parseInt(timeMatch[1]);
-              const minute = parseInt(timeMatch[2]);
-
-              if (!isNaN(hour) && !isNaN(minute)) {
-                sceneTimeInfo[trimmedValue] = { hour, minute };
-              }
-            }
-          }
-        }
       }
     }
   });
@@ -808,8 +785,8 @@ function processCSVDataCommon(
   cabinetName?: string,
   cabinetIndex?: number
 ): SceneProcessingResult {
-  // Tìm thông tin về scene và thời gian
-  const { sceneNames, sceneColumns, sceneTimeInfo } = findSceneHeaderAndNames(
+  // Tìm thông tin về scene
+  const { sceneNames, sceneColumns } = findSceneHeaderAndNames(
     rows,
     cabinetName
   );
@@ -943,7 +920,7 @@ function processCSVDataCommon(
   );
   scenes.push(...openCloseScenes);
 
-  return { scenes, sceneTimeInfo };
+  return { scenes };
 }
 
 /**
@@ -958,13 +935,10 @@ function processCSVData(rows: CSVRow[]): {
   }
 
   // Sử dụng hàm chung để xử lý dữ liệu
-  const { scenes, sceneTimeInfo } = processCSVDataCommon(rows);
+  const { scenes } = processCSVDataCommon(rows);
 
-  // Tạo schedules bằng cách sử dụng thông tin thời gian từ CSV
-  const schedules: Schedule[] = createSchedulesFromScenes(
-    scenes,
-    sceneTimeInfo
-  );
+  // Tạo schedules với thời gian cố định
+  const schedules: Schedule[] = createSchedulesFromScenes(scenes);
 
   return { scenes, schedules };
 }
@@ -1049,7 +1023,6 @@ function processCSVDataWithSeparateCabinets(rows: CSVRow[]): {
   });
 
   // Xử lý dữ liệu cho từng tủ
-  const allSceneTimeInfo: SceneTimeInfo = {};
   const allScenes: Scene[] = [];
 
   // Xử lý từng tủ
@@ -1058,7 +1031,7 @@ function processCSVDataWithSeparateCabinets(rows: CSVRow[]): {
     const cabinetRows = rows.slice(cabinet.startRow, cabinet.endRow + 1);
 
     // Xử lý dữ liệu của tủ hiện tại
-    const { scenes, sceneTimeInfo } = processCSVDataForCabinet(
+    const { scenes } = processCSVDataForCabinet(
       cabinetRows,
       cabinet.name,
       cabinetIndex
@@ -1066,20 +1039,10 @@ function processCSVDataWithSeparateCabinets(rows: CSVRow[]): {
 
     // Thêm scenes vào danh sách tổng
     allScenes.push(...scenes);
-
-    // Thêm thông tin thời gian vào map tổng
-    // Chuyển đổi tên scene gốc thành tên scene có chỉ số tủ
-    Object.entries(sceneTimeInfo).forEach(([sceneName, timeInfo]) => {
-      const sceneNameWithIndex = `${sceneName} ${cabinetIndex}`;
-      allSceneTimeInfo[sceneNameWithIndex] = timeInfo;
-    });
   });
 
-  // Tạo schedules chỉ cho những scene có thông tin thời gian
-  const schedules: Schedule[] = createSchedulesFromScenes(
-    allScenes,
-    allSceneTimeInfo
-  );
+  // Tạo schedules với thời gian cố định
+  const schedules: Schedule[] = createSchedulesFromScenes(allScenes);
 
   return { scenes: allScenes, schedules };
 }
@@ -1101,15 +1064,11 @@ function processCSVDataForCabinet(
 }
 
 /**
- * Tạo schedules từ danh sách scenes
+ * Tạo schedules từ danh sách scenes (chỉ cho DAY TIME, NIGHT TIME, và LATE TIME)
  * @param scenes Danh sách scenes
- * @param sceneTimeInfo Thông tin thời gian của các scene (tùy chọn)
  * @returns Danh sách schedules
  */
-function createSchedulesFromScenes(
-  scenes: Scene[],
-  sceneTimeInfo?: { [key: string]: { hour: number; minute: number } }
-): Schedule[] {
+function createSchedulesFromScenes(scenes: Scene[]): Schedule[] {
   const schedules: Schedule[] = [];
 
   // Tạo map để nhóm các scene theo tên cơ bản (không có chỉ số tủ)
@@ -1130,115 +1089,48 @@ function createSchedulesFromScenes(
     sceneGroups[baseSceneName].push(index + 1); // 1-based index for scene groups
   });
 
-  // Tạo schedules cho các nhóm scene
-  const defaultTimeMap: { [key: string]: { hour: number; minute: number } } = {
-    "DAY TIME": { hour: 6, minute: 0 },
-    "NIGHT TIME": { hour: 18, minute: 0 },
-    "LATE TIME": { hour: 1, minute: 0 },
+  // Cấu hình thời gian cố định cho các scene
+  const fixedTimeMap: { [key: string]: { hour: number; minute: number } } = {
+    DAY: { hour: 6, minute: 0 },
+    NIGHT: { hour: 18, minute: 0 },
+    LATE: { hour: 1, minute: 0 },
   };
 
-  // Nếu đang sử dụng chế độ tủ riêng biệt (có sceneTimeInfo)
-  if (sceneTimeInfo) {
-    // Tạo map để nhóm các scene có cùng tên cơ bản và có thông tin thời gian
-    const timeInfoByBaseScene: {
-      [key: string]: { hour: number; minute: number };
-    } = {};
+  // Tạo schedules cho DAY TIME, NIGHT TIME, và LATE TIME
+  // Tìm các scene có tên chứa "DAY", "NIGHT", hoặc "LATE" (không phân biệt hoa thường)
+  Object.entries(sceneGroups).forEach(([baseSceneName, sceneIndices]) => {
+    const upperSceneName = baseSceneName.toUpperCase();
 
-    // Thu thập thông tin thời gian cho các scene cơ bản
-    Object.entries(sceneTimeInfo).forEach(([sceneName, timeInfo]) => {
-      // Lấy tên cơ bản của scene (không có chỉ số tủ)
-      const baseSceneName = sceneName.replace(/\s+\d+$/, "");
-      timeInfoByBaseScene[baseSceneName] = timeInfo;
-    });
+    // Xác định loại scene và thời gian tương ứng
+    let scheduleTime = null;
 
-    // Chỉ tạo schedules cho các scene có thông tin thời gian
-    Object.entries(sceneGroups).forEach(([baseSceneName, sceneIndices]) => {
-      // Kiểm tra xem scene có thông tin thời gian không
-      if (timeInfoByBaseScene[baseSceneName]) {
-        const timeInfo = timeInfoByBaseScene[baseSceneName];
+    if (upperSceneName.includes("DAY")) {
+      scheduleTime = fixedTimeMap["DAY"];
+    } else if (upperSceneName.includes("NIGHT")) {
+      scheduleTime = fixedTimeMap["NIGHT"];
+    } else if (upperSceneName.includes("LATE")) {
+      scheduleTime = fixedTimeMap["LATE"];
+    }
 
-        schedules.push({
-          name: baseSceneName,
-          enable: true,
-          sceneAmount: sceneIndices.length,
-          sceneGroup: sceneIndices,
-          monday: true,
-          tuesday: true,
-          wednesday: true,
-          thursday: true,
-          friday: true,
-          saturday: true,
-          sunday: true,
-          hour: timeInfo.hour,
-          minute: timeInfo.minute,
-        });
-      }
-    });
-  } else {
-    // Chế độ thông thường (không có sceneTimeInfo)
-    // Tạo schedules cho các scene có trong defaultTimeMap
-    Object.entries(defaultTimeMap).forEach(([sceneName, timeInfo]) => {
-      // Kiểm tra xem có nhóm scene nào khớp với tên này không
-      if (sceneGroups[sceneName]) {
-        schedules.push({
-          name: sceneName,
-          enable: true,
-          sceneAmount: sceneGroups[sceneName].length,
-          sceneGroup: sceneGroups[sceneName],
-          monday: true,
-          tuesday: true,
-          wednesday: true,
-          thursday: true,
-          friday: true,
-          saturday: true,
-          sunday: true,
-          hour: timeInfo.hour,
-          minute: timeInfo.minute,
-        });
-      }
-    });
-
-    // Tạo schedules cho các nhóm scene khác
-    Object.entries(sceneGroups).forEach(([baseSceneName, sceneIndices]) => {
-      // Bỏ qua các scene đã xử lý trong defaultTimeMap
-      if (Object.keys(defaultTimeMap).includes(baseSceneName)) {
-        return;
-      }
-
-      // Xác định thời gian dựa trên tên scene
-      let hour = 12;
-      // eslint-disable-next-line prefer-const
-      let minute = 0;
-
-      if (baseSceneName.toUpperCase().includes("DAY")) {
-        hour = 6;
-      } else if (baseSceneName.toUpperCase().includes("NIGHT")) {
-        hour = 18;
-      } else if (baseSceneName.toUpperCase().includes("LATE")) {
-        hour = 1;
-      }
-
-      // Kiểm tra xem schedule này đã tồn tại chưa
-      const existingSchedule = schedules.find((s) => s.name === baseSceneName);
-      if (!existingSchedule) {
-        schedules.push({
-          name: baseSceneName,
-          enable: true,
-          sceneAmount: sceneIndices.length,
-          sceneGroup: sceneIndices,
-          monday: true,
-          tuesday: true,
-          wednesday: true,
-          thursday: true,
-          friday: true,
-          saturday: true,
-          sunday: true,
-          hour,
-          minute,
-        });
-      }
-    });
-  }
+    // Nếu là một trong các loại scene cần tạo schedule
+    if (scheduleTime) {
+      schedules.push({
+        name: baseSceneName,
+        enable: true,
+        sceneAmount: sceneIndices.length,
+        sceneGroup: sceneIndices,
+        monday: true,
+        tuesday: true,
+        wednesday: true,
+        thursday: true,
+        friday: true,
+        saturday: true,
+        sunday: true,
+        hour: scheduleTime.hour,
+        minute: scheduleTime.minute,
+      });
+    }
+  });
 
   return schedules;
 }
