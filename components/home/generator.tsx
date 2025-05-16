@@ -52,6 +52,9 @@ import { parseCSV } from "@/lib/csv-parser";
 
 // Lazy loaded components
 const OverviewDialog = lazy(() => import("@/components/home/drag-dialog"));
+const ImportCSVDialog = lazy(
+  () => import("@/components/home/import-csv-dialog")
+);
 
 // Import types from app-types.ts
 import { Light, Scene, Schedule } from "@/types/app-types";
@@ -1213,6 +1216,10 @@ export default function Generator() {
     }
   }, []);
 
+  // State cho dialog chọn chế độ import CSV
+  const [importCSVDialogOpen, setImportCSVDialogOpen] = useState(false);
+  const [pendingCSVFile, setPendingCSVFile] = useState<File | null>(null);
+
   // Hàm nhập cấu hình từ file CSV
   const handleImportCSV = useCallback(() => {
     try {
@@ -1225,57 +1232,9 @@ export default function Generator() {
         const file = (e.target as HTMLInputElement).files?.[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          // Hiển thị toast loading và lưu ID để có thể đóng sau này
-          const loadingToastId = toast.loading("Đang xử lý file CSV...");
-
-          try {
-            const content = event.target?.result as string;
-
-            // Sử dụng hàm parseCSV để chuyển đổi dữ liệu CSV thành scenes và schedules
-            const { scenes: parsedScenes, schedules: parsedSchedules } =
-              await parseCSV(content);
-
-            if (parsedScenes.length === 0) {
-              // Đóng toast loading
-              toast.dismiss(loadingToastId);
-              throw new Error("Không tìm thấy scene nào trong file CSV");
-            }
-
-            // Cập nhật state với dữ liệu từ file
-            dispatch({ type: "SET_SCENES", scenes: parsedScenes });
-
-            // Chỉ cập nhật schedules nếu có
-            if (parsedSchedules.length > 0) {
-              dispatch({ type: "SET_SCHEDULES", schedules: parsedSchedules });
-            }
-
-            // Đóng toast loading
-            toast.dismiss(loadingToastId);
-
-            toast.success("Nhập dữ liệu CSV thành công!", {
-              description: `Đã nhập ${parsedScenes.length} scene${
-                parsedSchedules.length > 0
-                  ? ` và ${parsedSchedules.length} schedule`
-                  : ""
-              } từ file CSV.`,
-              duration: 6000,
-            });
-          } catch (error) {
-            console.error("Lỗi khi đọc file CSV:", error);
-            // Đóng toast loading nếu chưa đóng
-            toast.dismiss(loadingToastId);
-
-            toast.error("Nhập dữ liệu CSV thất bại!", {
-              description:
-                "File CSV không hợp lệ hoặc không đúng định dạng. Vui lòng kiểm tra lại.",
-              duration: 6000,
-            });
-          }
-        };
-
-        reader.readAsText(file);
+        // Lưu file và mở dialog chọn chế độ import
+        setPendingCSVFile(file);
+        setImportCSVDialogOpen(true);
       };
 
       // Kích hoạt dialog chọn file
@@ -1288,6 +1247,77 @@ export default function Generator() {
       });
     }
   }, []);
+
+  // Hàm xử lý khi người dùng đã chọn chế độ import
+  const handleImportCSVConfirm = useCallback(
+    async (separateCabinets: boolean) => {
+      if (!pendingCSVFile) return;
+
+      // Hiển thị toast loading và lưu ID để có thể đóng sau này
+      const loadingToastId = toast.loading("Đang xử lý file CSV...");
+
+      try {
+        // Đọc nội dung file
+        const content = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            resolve(event.target?.result as string);
+          };
+          reader.onerror = reject;
+          reader.readAsText(pendingCSVFile);
+        });
+
+        // Sử dụng hàm parseCSV để chuyển đổi dữ liệu CSV thành scenes và schedules
+        const { scenes: parsedScenes, schedules: parsedSchedules } =
+          await parseCSV(content, separateCabinets);
+
+        if (parsedScenes.length === 0) {
+          // Đóng toast loading
+          toast.dismiss(loadingToastId);
+          throw new Error("Không tìm thấy scene nào trong file CSV");
+        }
+
+        // Cập nhật state với dữ liệu từ file
+        dispatch({ type: "SET_SCENES", scenes: parsedScenes });
+
+        // Chỉ cập nhật schedules nếu có
+        if (parsedSchedules.length > 0) {
+          dispatch({ type: "SET_SCHEDULES", schedules: parsedSchedules });
+        }
+
+        // Đóng toast loading
+        toast.dismiss(loadingToastId);
+
+        // Hiển thị thông báo thành công
+        const modeDescription = separateCabinets
+          ? "chế độ điều khiển tủ riêng biệt"
+          : "chế độ điều khiển toàn bộ tủ";
+
+        toast.success("Nhập dữ liệu CSV thành công!", {
+          description: `Đã nhập ${parsedScenes.length} scene${
+            parsedSchedules.length > 0
+              ? ` và ${parsedSchedules.length} schedule`
+              : ""
+          } từ file CSV với ${modeDescription}.`,
+          duration: 6000,
+        });
+
+        // Xóa file đang chờ xử lý
+        setPendingCSVFile(null);
+      } catch (error) {
+        console.error("Lỗi khi đọc file CSV:", error);
+        // Đóng toast loading nếu chưa đóng
+        toast.dismiss(loadingToastId);
+
+        toast.error("Nhập dữ liệu CSV thất bại!", {
+          description:
+            "File CSV không hợp lệ hoặc không đúng định dạng. Vui lòng kiểm tra lại.",
+          duration: 6000,
+        });
+      }
+    },
+    [pendingCSVFile]
+  );
 
   // Memoized CodeBlock props to prevent re-renders when unrelated state changes
   const codeBlockProps = useMemo(() => {
@@ -1440,6 +1470,15 @@ export default function Generator() {
         </div>
       }
     >
+      {/* Dialog chọn chế độ import CSV */}
+      <Suspense fallback={loadingFallback}>
+        <ImportCSVDialog
+          open={importCSVDialogOpen}
+          onOpenChange={setImportCSVDialogOpen}
+          onConfirm={handleImportCSVConfirm}
+        />
+      </Suspense>
+
       <div className="p-4 lg:px-10">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Left Column - Input Form */}
