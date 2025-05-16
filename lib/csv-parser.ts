@@ -2,6 +2,35 @@ import { Light, Scene, Schedule } from "@/types/app-types";
 import csvParser from "csv-parser";
 import { Readable } from "stream";
 
+// Types for internal use
+interface SceneTimeInfo {
+  [key: string]: { hour: number; minute: number };
+}
+
+interface LightInfo {
+  name: string;
+  values: { [key: string]: number };
+}
+
+interface LightsByGroup {
+  [key: number]: LightInfo;
+}
+
+interface OpenCloseLights {
+  [key: string]: { open: Light[]; close: Light[] };
+}
+
+// Define a more specific type for CSV row data
+interface CSVRow {
+  [key: string]: string | number | null;
+}
+
+// Common scene processing result type
+interface SceneProcessingResult {
+  scenes: Scene[];
+  sceneTimeInfo: SceneTimeInfo;
+}
+
 /**
  * Kiểm tra xem các group có liên tục không và tất cả đèn có cùng độ sáng không
  * @param lights Danh sách đèn cần kiểm tra
@@ -10,143 +39,165 @@ import { Readable } from "stream";
 function checkContinuousGroups(lights: Light[]): boolean {
   if (lights.length <= 1) return true;
 
-  // Sắp xếp đèn theo group
-  const sortedLights = [...lights].sort((a, b) => a.group - b.group);
+  // Tìm giá trị độ sáng đầu tiên và kiểm tra xem tất cả đèn có cùng độ sáng không
+  const firstValue = lights[0].value;
 
-  // Kiểm tra xem tất cả đèn có cùng độ sáng không
-  const firstValue = sortedLights[0].value;
-  const allSameBrightness = sortedLights.every(
-    (light) => light.value === firstValue
-  );
+  // Tìm giá trị group nhỏ nhất và lớn nhất
+  let minGroup = lights[0].group;
+  let maxGroup = lights[0].group;
 
-  if (!allSameBrightness) {
-    return false;
-  }
-
-  // Kiểm tra xem các group có liên tục không
-  for (let i = 1; i < sortedLights.length; i++) {
-    if (sortedLights[i].group !== sortedLights[i - 1].group + 1) {
+  // Kiểm tra độ sáng và tìm min/max group trong một lần duyệt
+  for (let i = 1; i < lights.length; i++) {
+    // Kiểm tra độ sáng
+    if (lights[i].value !== firstValue) {
       return false;
     }
-  }
 
-  return true;
-}
-
-/**
- * Parse CSV content and convert it to scenes and schedules
- * @param csvContent The CSV file content as string
- * @param separateCabinets Whether to process each cabinet separately
- * @returns Object containing scenes and schedules
- */
-export function parseCSV(
-  csvContent: string,
-  separateCabinets: boolean = false
-): Promise<{
-  scenes: Scene[];
-  schedules: Schedule[];
-}> {
-  return new Promise((resolve, reject) => {
-    try {
-      // Tạo một stream từ nội dung CSV
-      const stream = Readable.from([csvContent]);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const results: any[] = [];
-
-      // Sử dụng csv-parser để parse dữ liệu
-      stream
-        .pipe(
-          csvParser({
-            skipLines: 0,
-            headers: false,
-            skipComments: true,
-          })
-        )
-        .on("data", (data) => results.push(data))
-        .on("end", () => {
-          try {
-            // Xử lý dữ liệu đã parse
-            if (separateCabinets) {
-              // Xử lý từng tủ riêng biệt
-              const processedData = processCSVDataWithSeparateCabinets(results);
-              resolve(processedData);
-            } else {
-              // Xử lý tất cả tủ cùng nhau (cách cũ)
-              const processedData = processCSVData(results);
-              resolve(processedData);
-            }
-          } catch (error) {
-            reject(error);
-          }
-        })
-        .on("error", (error) => {
-          reject(error);
-        });
-    } catch (error) {
-      reject(error);
+    // Cập nhật min/max group
+    if (lights[i].group < minGroup) {
+      minGroup = lights[i].group;
+    } else if (lights[i].group > maxGroup) {
+      maxGroup = lights[i].group;
     }
-  });
-}
-
-/**
- * Xử lý dữ liệu CSV đã parse
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function processCSVData(rows: any[]): {
-  scenes: Scene[];
-  schedules: Schedule[];
-} {
-  if (rows.length < 5) {
-    throw new Error("CSV file is too short or empty");
   }
 
-  // Tìm hàng chứa thông tin về scene
+  // Kiểm tra xem số lượng đèn có bằng với khoảng group không
+  // Nếu bằng thì các group liên tục và không trùng lặp
+  return lights.length === maxGroup - minGroup + 1;
+}
+
+// Cached regular expressions
+const PERCENT_REGEX = /%/g;
+
+/**
+ * Chuyển đổi giá trị độ sáng từ nhiều định dạng khác nhau sang số
+ * @param value Giá trị độ sáng cần chuyển đổi
+ * @returns Giá trị độ sáng dạng số (0-100)
+ */
+function convertBrightnessValue(
+  value: string | number | null | undefined
+): number {
+  // Giá trị mặc định là 100
+  const DEFAULT_BRIGHTNESS = 100;
+
+  // Nếu giá trị không tồn tại hoặc là chuỗi rỗng, trả về giá trị mặc định
+  if (value === undefined || value === null || value === "") {
+    return DEFAULT_BRIGHTNESS;
+  }
+
+  // Chuyển đổi thành chuỗi và cắt khoảng trắng
+  const strValue = value.toString().trim().toLowerCase();
+
+  // Xử lý các trường hợp đặc biệt
+  if (strValue === "on" || strValue === "on/off") {
+    return 100;
+  }
+
+  if (strValue === "off") {
+    return 0;
+  }
+
+  // Loại bỏ dấu phần trăm và xử lý chuỗi rỗng
+  const cleanValue = strValue.replace(PERCENT_REGEX, "");
+  if (cleanValue === "") {
+    return DEFAULT_BRIGHTNESS;
+  }
+
+  // Chuyển đổi thành số và kiểm tra giá trị hợp lệ
+  const brightness = parseInt(cleanValue);
+  if (!isNaN(brightness) && brightness >= 0 && brightness <= 100) {
+    return brightness;
+  }
+
+  // Trả về giá trị mặc định nếu không hợp lệ
+  return DEFAULT_BRIGHTNESS;
+}
+
+// Cached regular expressions
+const TIME_REGEX = /(\d+):(\d+)/;
+const SCENE_HEADER_KEYWORDS = ["SCENE SETTING", "SCENE OVERIDE"];
+
+/**
+ * Tìm hàng chứa thông tin về scene và trích xuất tên scene và thông tin thời gian
+ * @param rows Dữ liệu CSV đã parse
+ * @param cabinetName Tên tủ (tùy chọn, dùng cho thông báo lỗi)
+ * @returns Thông tin về scene và thời gian
+ */
+function findSceneHeaderAndNames(
+  rows: CSVRow[],
+  cabinetName?: string
+): {
+  sceneHeaderRow: number;
+  sceneNameRow: number;
+  sceneColumns: { [key: string]: number };
+  sceneNames: string[];
+  sceneTimeInfo: SceneTimeInfo;
+} {
+  // Tìm hàng chứa thông tin về scene (giới hạn tìm kiếm trong 10 dòng đầu)
   let sceneHeaderRow = -1;
   let sceneNameRow = -1;
+  const maxSearchRows = Math.min(10, rows.length);
 
-  for (let i = 0; i < Math.min(10, rows.length); i++) {
+  for (let i = 0; i < maxSearchRows; i++) {
     const rowValues = Object.values(rows[i]);
-    const rowStr = rowValues.join(",");
+    const rowStr = rowValues.join(",").toUpperCase();
 
-    if (rowStr.includes("SCENE SETTING") || rowStr.includes("SCENE OVERIDE")) {
+    // Kiểm tra các từ khóa scene header
+    if (SCENE_HEADER_KEYWORDS.some((keyword) => rowStr.includes(keyword))) {
       sceneHeaderRow = i;
       sceneNameRow = i + 1;
       break;
     }
   }
 
+  // Xử lý lỗi nếu không tìm thấy scene header
   if (sceneHeaderRow === -1 || sceneNameRow === -1) {
-    throw new Error("Could not find scene header row in CSV");
+    const errorMsg = cabinetName
+      ? `Không tìm thấy thông tin scene trong tủ ${cabinetName}`
+      : "Could not find scene header row in CSV";
+    throw new Error(errorMsg);
   }
 
   // Tìm các cột chứa tên scene
   const sceneColumns: { [key: string]: number } = {};
   const sceneNames: string[] = [];
-  const sceneTimeInfo: { [key: string]: { hour: number; minute: number } } = {};
+  const sceneTimeInfo: SceneTimeInfo = {};
+  const sceneNameRow_data = rows[sceneNameRow];
+  const hasNextRow = sceneNameRow + 1 < rows.length;
+  const nextRow = hasNextRow ? rows[sceneNameRow + 1] : null;
 
-  Object.entries(rows[sceneNameRow]).forEach(([key, value]) => {
-    if (
-      value &&
-      typeof value === "string" &&
-      value.trim() !== "" &&
-      !value.includes(":")
-    ) {
-      const sceneName = value.trim();
-      const colIndex = parseInt(key);
-      sceneColumns[sceneName] = colIndex;
-      sceneNames.push(sceneName);
+  // Xử lý từng cột trong hàng chứa tên scene
+  Object.entries(sceneNameRow_data).forEach(([key, value]) => {
+    // Chỉ xử lý các giá trị chuỗi hợp lệ
+    if (value && typeof value === "string") {
+      const trimmedValue = value.trim();
 
-      // Kiểm tra dòng tiếp theo để lấy thông tin thời gian
-      if (sceneNameRow + 1 < rows.length) {
-        const timeValue = rows[sceneNameRow + 1][colIndex];
-        if (timeValue && typeof timeValue === "string") {
-          // Tìm kiếm định dạng thời gian (ví dụ: "6:00", "18:00")
-          const timeMatch = timeValue.match(/(\d+):(\d+)/);
-          if (timeMatch) {
-            const hour = parseInt(timeMatch[1]);
-            const minute = parseInt(timeMatch[2]);
-            if (!isNaN(hour) && !isNaN(minute)) {
-              sceneTimeInfo[sceneName] = { hour, minute };
+      if (trimmedValue !== "" && !trimmedValue.includes(":")) {
+        // Bỏ qua các scene có tên bắt đầu bằng "OPEN" hoặc "CLOSE"
+        const upperValue = trimmedValue.toUpperCase();
+        if (upperValue.startsWith("OPEN") || upperValue.startsWith("CLOSE")) {
+          return;
+        }
+
+        const colIndex = parseInt(key);
+        sceneColumns[trimmedValue] = colIndex;
+        sceneNames.push(trimmedValue);
+
+        // Kiểm tra dòng tiếp theo để lấy thông tin thời gian
+        if (hasNextRow && nextRow) {
+          const timeValue = nextRow[colIndex];
+
+          if (timeValue && typeof timeValue === "string") {
+            // Tìm kiếm định dạng thời gian (ví dụ: "6:00", "18:00")
+            const timeMatch = timeValue.match(TIME_REGEX);
+
+            if (timeMatch) {
+              const hour = parseInt(timeMatch[1]);
+              const minute = parseInt(timeMatch[2]);
+
+              if (!isNaN(hour) && !isNaN(minute)) {
+                sceneTimeInfo[trimmedValue] = { hour, minute };
+              }
             }
           }
         }
@@ -154,203 +205,211 @@ function processCSVData(rows: any[]): {
     }
   });
 
+  // Xử lý lỗi nếu không tìm thấy tên scene
   if (sceneNames.length === 0) {
-    throw new Error("No scene names found in CSV");
+    const noScenesErrorMsg = cabinetName
+      ? `Không tìm thấy tên scene trong tủ ${cabinetName}`
+      : "No scene names found in CSV";
+    throw new Error(noScenesErrorMsg);
   }
 
-  // Tìm cột chứa thông tin về group và tên đèn
+  return {
+    sceneHeaderRow,
+    sceneNameRow,
+    sceneColumns,
+    sceneNames,
+    sceneTimeInfo,
+  };
+}
+
+// Cached column header keywords
+const GROUP_COLUMN_KEYWORDS = ["GROUP", "ĐỊA CHỈ"];
+const NAME_COLUMN_KEYWORDS = ["TÊN LỘ", "TEN LO"];
+
+/**
+ * Tìm cột chứa thông tin về group và tên đèn
+ * @param rows Dữ liệu CSV đã parse
+ * @param cabinetName Tên tủ (tùy chọn, dùng cho thông báo lỗi)
+ * @returns Chỉ số cột chứa thông tin group và tên đèn
+ */
+function findGroupAndNameColumns(
+  rows: CSVRow[],
+  cabinetName?: string
+): {
+  groupColumn: number;
+  nameColumn: number;
+} {
   let groupColumn = -1;
   let nameColumn = -1;
+  const maxSearchRows = Math.min(10, rows.length);
 
-  for (let i = 0; i < Math.min(10, rows.length); i++) {
-    Object.entries(rows[i]).forEach(([key, value]) => {
-      if (value && typeof value === "string") {
-        const valueStr = value.toString().toUpperCase();
+  // Tìm kiếm trong 10 dòng đầu tiên
+  for (let i = 0; i < maxSearchRows; i++) {
+    const row = rows[i];
 
-        if (valueStr.includes("GROUP") || valueStr.includes("ĐỊA CHỈ")) {
-          groupColumn = parseInt(key);
-        }
+    // Kiểm tra từng cột trong dòng
+    for (const [key, value] of Object.entries(row)) {
+      if (!value || typeof value !== "string") continue;
 
-        if (valueStr.includes("TÊN LỘ") || valueStr.includes("TEN LO")) {
-          nameColumn = parseInt(key);
-        }
+      const valueStr = value.toString().toUpperCase();
+      const keyNum = parseInt(key);
+
+      // Kiểm tra từ khóa cột group
+      if (GROUP_COLUMN_KEYWORDS.some((keyword) => valueStr.includes(keyword))) {
+        groupColumn = keyNum;
       }
-    });
 
+      // Kiểm tra từ khóa cột tên đèn
+      if (NAME_COLUMN_KEYWORDS.some((keyword) => valueStr.includes(keyword))) {
+        nameColumn = keyNum;
+      }
+    }
+
+    // Nếu đã tìm thấy cột group, dừng tìm kiếm
     if (groupColumn !== -1) {
       break;
     }
   }
 
+  // Xử lý lỗi nếu không tìm thấy cột group
   if (groupColumn === -1) {
-    throw new Error("Could not find Group column in CSV");
+    const errorMsg = cabinetName
+      ? `Không tìm thấy cột Group trong tủ ${cabinetName}`
+      : "Could not find Group column in CSV";
+    throw new Error(errorMsg);
   }
 
-  // Tạo scenes
-  const scenes: Scene[] = sceneNames.map((name) => ({
-    name,
-    amount: 0,
-    lights: [],
-    isSequential: false,
-  }));
+  return { groupColumn, nameColumn };
+}
 
-  // Xử lý từng dòng để lấy thông tin đèn
-  const lightsByGroup: {
-    [key: number]: { name: string; values: { [key: string]: number } };
-  } = {};
+// Cached regular expressions
+const GROUP_NUMBER_REGEX = /GROUP\s*(\d+)/i;
+const OPEN_CLOSE_NUMBER_REGEX = /\d+/;
+const DEFAULT_LIGHT_NAME = "Đèn chưa đặt tên";
 
-  // Lưu trữ đèn OPEN và CLOSE theo số
-  const openCloseLightsByNumber: {
-    [key: string]: { open: Light[]; close: Light[] };
-  } = {};
-
-  // Lưu trữ danh sách các group đèn OPEN/CLOSE để loại bỏ khỏi scene thông thường
+/**
+ * Xử lý dữ liệu đèn từ CSV
+ * @param rows Dữ liệu CSV đã parse
+ * @param groupColumn Cột chứa thông tin group
+ * @param nameColumn Cột chứa thông tin tên đèn
+ * @param sceneColumns Map giữa tên scene và cột chứa giá trị độ sáng
+ * @param sceneNames Danh sách tên scene
+ * @returns Thông tin về đèn đã xử lý
+ */
+function processLightData(
+  rows: CSVRow[],
+  groupColumn: number,
+  nameColumn: number,
+  sceneColumns: { [key: string]: number },
+  sceneNames: string[]
+): {
+  lightsByGroup: LightsByGroup;
+  openCloseLightsByNumber: OpenCloseLights;
+  openCloseGroups: Set<number>;
+  groupCounts: { [key: number]: number };
+} {
+  // Khởi tạo các cấu trúc dữ liệu kết quả
+  const lightsByGroup: LightsByGroup = {};
+  const openCloseLightsByNumber: OpenCloseLights = {};
   const openCloseGroups = new Set<number>();
-
-  // Lưu trữ danh sách các group đã xuất hiện để kiểm tra trùng lặp
   const groupCounts: { [key: number]: number } = {};
 
-  // Đầu tiên, đếm số lần xuất hiện của mỗi group
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-
-    // Bỏ qua các dòng không có thông tin group
+  // Hàm helper để lấy thông tin group từ một dòng
+  const getGroupInfo = (
+    row: CSVRow
+  ): { valid: boolean; groupNumber: number } => {
+    // Kiểm tra dòng có thông tin group không
     if (
       !row[groupColumn] ||
       !row[groupColumn].toString().toUpperCase().includes("GROUP")
     ) {
-      continue;
+      return { valid: false, groupNumber: -1 };
     }
 
     // Lấy số group
-    const groupMatch = row[groupColumn].toString().match(/GROUP\s*(\d+)/i);
+    const groupMatch = row[groupColumn].toString().match(GROUP_NUMBER_REGEX);
     if (!groupMatch) {
-      continue;
+      return { valid: false, groupNumber: -1 };
     }
 
-    const groupNumber = parseInt(groupMatch[1]);
+    return { valid: true, groupNumber: parseInt(groupMatch[1]) };
+  };
 
-    // Lấy tên đèn
-    let lightName = "Đèn chưa đặt tên";
+  // Hàm helper để lấy tên đèn từ một dòng
+  const getLightName = (row: CSVRow): string => {
     if (
       nameColumn !== -1 &&
       row[nameColumn] &&
       row[nameColumn].toString().trim() !== ""
     ) {
-      lightName = row[nameColumn].toString().trim();
+      return row[nameColumn].toString().trim();
     }
+    return DEFAULT_LIGHT_NAME;
+  };
 
-    // Kiểm tra xem đèn có phải là OPEN hoặc CLOSE không
-    const isOpenLight = lightName.toUpperCase().startsWith("OPEN");
-    const isCloseLight = lightName.toUpperCase().startsWith("CLOSE");
-
-    // Không đếm đèn OPEN/CLOSE
-    if (isOpenLight || isCloseLight) {
-      continue;
-    }
-
-    // Tăng số lần xuất hiện của group
-    groupCounts[groupNumber] = (groupCounts[groupNumber] || 0) + 1;
-  }
-
-  // Sau đó, xử lý từng dòng để lấy thông tin đèn
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-
-    // Bỏ qua các dòng không có thông tin group
-    if (
-      !row[groupColumn] ||
-      !row[groupColumn].toString().toUpperCase().includes("GROUP")
-    ) {
-      continue;
-    }
-
-    // Lấy số group
-    const groupMatch = row[groupColumn].toString().match(/GROUP\s+(\d+)/i);
-    if (!groupMatch) {
-      continue;
-    }
-
-    const groupNumber = parseInt(groupMatch[1]);
-    const groupName = `Group ${groupNumber}`;
-
-    // Lấy tên đèn
-    let lightName = "Đèn chưa đặt tên";
-    if (
-      nameColumn !== -1 &&
-      row[nameColumn] &&
-      row[nameColumn].toString().trim() !== ""
-    ) {
-      lightName = row[nameColumn].toString().trim();
-    }
-
-    // Kiểm tra xem đèn có phải là OPEN hoặc CLOSE không
-    const isOpenLight = lightName.toUpperCase().startsWith("OPEN");
-    const isCloseLight = lightName.toUpperCase().startsWith("CLOSE");
-
-    // Xác định số của OPEN/CLOSE (ví dụ: OPEN 1 -> 1)
-    let openCloseNumber = "";
-    if (isOpenLight || isCloseLight) {
-      const match = lightName.match(/\d+/);
-      if (match) {
-        openCloseNumber = match[0];
-      }
-    }
-
-    // Lấy giá trị độ sáng cho từng scene
+  // Hàm helper để lấy giá trị độ sáng cho các scene
+  const getSceneValues = (row: CSVRow): { [key: string]: number } => {
     const sceneValues: { [key: string]: number } = {};
 
     sceneNames.forEach((sceneName) => {
       const colIndex = sceneColumns[sceneName];
 
-      // Kiểm tra xem cột có tồn tại không
       if (colIndex !== undefined) {
-        // Lấy giá trị từ cột, xử lý cả trường hợp giá trị là 0
         const cellValue = row[colIndex];
-        let value = "";
-
-        // Kiểm tra xem giá trị có tồn tại không (bao gồm cả 0)
-        if (cellValue !== undefined && cellValue !== null) {
-          value = cellValue.toString().trim();
-        }
-
-        // Chuyển đổi giá trị
-        if (value.toLowerCase() === "on" || value.toLowerCase() === "on/off") {
-          value = "100";
-        } else if (value.toLowerCase() === "off") {
-          value = "0";
-        } else {
-          // Loại bỏ dấu phần trăm
-          value = value.replace(/%/g, "");
-        }
-
-        // Mặc định là 100 nếu trống
-        if (value === "") {
-          value = "100";
-        }
-
-        // Chuyển đổi thành số
-        const brightness = parseInt(value);
-
-        // Kiểm tra giá trị hợp lệ
-        if (!isNaN(brightness) && brightness >= 0 && brightness <= 100) {
-          sceneValues[sceneName] = brightness;
-        } else {
-          sceneValues[sceneName] = 100; // Giá trị mặc định
-        }
+        sceneValues[sceneName] = convertBrightnessValue(cellValue);
       } else {
         sceneValues[sceneName] = 100; // Giá trị mặc định
       }
     });
 
+    return sceneValues;
+  };
+
+  // Bước 1: Đếm số lần xuất hiện của mỗi group (không bao gồm OPEN/CLOSE)
+  for (const row of rows) {
+    const { valid, groupNumber } = getGroupInfo(row);
+    if (!valid) continue;
+
+    const lightName = getLightName(row);
+
+    // Kiểm tra xem đèn có phải là OPEN hoặc CLOSE không
+    const isOpenOrCloseLight =
+      lightName.toUpperCase().startsWith("OPEN") ||
+      lightName.toUpperCase().startsWith("CLOSE");
+
+    // Không đếm đèn OPEN/CLOSE
+    if (!isOpenOrCloseLight) {
+      groupCounts[groupNumber] = (groupCounts[groupNumber] || 0) + 1;
+    }
+  }
+
+  // Bước 2: Xử lý từng dòng để lấy thông tin đèn
+  for (const row of rows) {
+    const { valid, groupNumber } = getGroupInfo(row);
+    if (!valid) continue;
+
+    const groupName = `Group ${groupNumber}`;
+    const lightName = getLightName(row);
+
+    // Kiểm tra xem đèn có phải là OPEN hoặc CLOSE không
+    const isOpenLight = lightName.toUpperCase().startsWith("OPEN");
+    const isCloseLight = lightName.toUpperCase().startsWith("CLOSE");
+    const isOpenOrCloseLight = isOpenLight || isCloseLight;
+
+    // Lấy giá trị độ sáng cho từng scene
+    const sceneValues = getSceneValues(row);
+
     // Xử lý đèn OPEN/CLOSE
-    if ((isOpenLight || isCloseLight) && openCloseNumber) {
-      // Tạo key dựa trên số của đèn OPEN/CLOSE
-      const numberKey = openCloseNumber;
+    if (isOpenOrCloseLight) {
+      // Xác định số của OPEN/CLOSE (ví dụ: OPEN 1 -> 1)
+      const match = lightName.match(OPEN_CLOSE_NUMBER_REGEX);
+      if (!match) continue;
+
+      const openCloseNumber = match[0];
 
       // Khởi tạo cấu trúc lưu trữ nếu chưa tồn tại
-      if (!openCloseLightsByNumber[numberKey]) {
-        openCloseLightsByNumber[numberKey] = {
+      if (!openCloseLightsByNumber[openCloseNumber]) {
+        openCloseLightsByNumber[openCloseNumber] = {
           open: [],
           close: [],
         };
@@ -364,9 +423,9 @@ function processCSVData(rows: any[]): {
       };
 
       if (isOpenLight) {
-        openCloseLightsByNumber[numberKey].open.push(light);
+        openCloseLightsByNumber[openCloseNumber].open.push(light);
       } else {
-        openCloseLightsByNumber[numberKey].close.push(light);
+        openCloseLightsByNumber[openCloseNumber].close.push(light);
       }
 
       // Thêm group vào danh sách các group đèn OPEN/CLOSE
@@ -384,8 +443,287 @@ function processCSVData(rows: any[]): {
     }
   }
 
-  // Tạo danh sách đèn cho từng scene
-  sceneNames.forEach((sceneName, sceneIndex) => {
+  return {
+    lightsByGroup,
+    openCloseLightsByNumber,
+    openCloseGroups,
+    groupCounts,
+  };
+}
+
+/**
+ * Tạo scene MASTER ON và MASTER OFF
+ * @param allLights Danh sách tất cả đèn
+ * @param cabinetIndex Chỉ số tủ (tùy chọn)
+ * @returns Danh sách scene MASTER ON và MASTER OFF
+ */
+function createMasterScenes(
+  allLights: Light[],
+  cabinetIndex?: number
+): Scene[] {
+  const scenes: Scene[] = [];
+
+  if (allLights.length === 0) {
+    return scenes;
+  }
+
+  // Tạo scene MASTER ON
+  const masterOnLights = allLights.map((light) => ({
+    ...light,
+    value: 100, // Tất cả đèn có độ sáng 100%
+  }));
+
+  // Kiểm tra xem các group có liên tục không
+  const isOnGroupContinuous = checkContinuousGroups(masterOnLights);
+  const masterOnName = cabinetIndex ? `MASTER ON ${cabinetIndex}` : "MASTER ON";
+
+  if (isOnGroupContinuous) {
+    // Nếu các group liên tục, sử dụng mode group liên tục
+    const minGroup = Math.min(...masterOnLights.map((light) => light.group));
+    scenes.push({
+      name: masterOnName,
+      amount: masterOnLights.length,
+      lights: [{ name: "Đèn chưa đặt tên", group: minGroup, value: 100 }],
+      isSequential: true,
+      startGroup: minGroup,
+    });
+  } else {
+    // Nếu các group không liên tục, sử dụng mode thông thường
+    scenes.push({
+      name: masterOnName,
+      amount: masterOnLights.length,
+      lights: masterOnLights,
+      isSequential: false,
+    });
+  }
+
+  // Tạo scene MASTER OFF
+  const masterOffLights = allLights.map((light) => ({
+    ...light,
+    value: 0, // Tất cả đèn có độ sáng 0%
+  }));
+
+  // Kiểm tra xem các group có liên tục không
+  const isOffGroupContinuous = checkContinuousGroups(masterOffLights);
+  const masterOffName = cabinetIndex
+    ? `MASTER OFF ${cabinetIndex}`
+    : "MASTER OFF";
+
+  if (isOffGroupContinuous) {
+    // Nếu các group liên tục, sử dụng mode group liên tục
+    const minGroup = Math.min(...masterOffLights.map((light) => light.group));
+    scenes.push({
+      name: masterOffName,
+      amount: masterOffLights.length,
+      lights: [{ name: "Đèn chưa đặt tên", group: minGroup, value: 0 }],
+      isSequential: true,
+      startGroup: minGroup,
+    });
+  } else {
+    // Nếu các group không liên tục, sử dụng mode thông thường
+    scenes.push({
+      name: masterOffName,
+      amount: masterOffLights.length,
+      lights: masterOffLights,
+      isSequential: false,
+    });
+  }
+
+  return scenes;
+}
+
+/**
+ * Tạo các scene OPEN/CLOSE
+ * @param openCloseLightsByNumber Thông tin đèn OPEN/CLOSE
+ * @param cabinetIndex Chỉ số tủ (tùy chọn)
+ * @returns Danh sách scene OPEN/CLOSE
+ */
+function createOpenCloseScenes(
+  openCloseLightsByNumber: OpenCloseLights,
+  cabinetIndex?: number
+): Scene[] {
+  const scenes: Scene[] = [];
+
+  Object.entries(openCloseLightsByNumber).forEach(([number, lightsObj]) => {
+    // Kiểm tra xem có cả đèn OPEN và CLOSE không
+    const hasOpenLights = lightsObj.open.length > 0;
+    const hasCloseLights = lightsObj.close.length > 0;
+
+    // Chỉ tạo scene OPEN nếu có ít nhất một đèn OPEN hoặc CLOSE
+    if (hasOpenLights || hasCloseLights) {
+      // Tạo danh sách đèn cho scene OPEN
+      const openSceneLights: Light[] = [];
+
+      // Thêm đèn OPEN với độ sáng 100%
+      if (hasOpenLights) {
+        lightsObj.open.forEach((light) => {
+          openSceneLights.push({
+            ...light,
+            value: 100, // Đèn OPEN sáng 100% trong scene OPEN
+          });
+        });
+      }
+
+      // Thêm đèn CLOSE với độ sáng 0%
+      if (hasCloseLights) {
+        lightsObj.close.forEach((light) => {
+          openSceneLights.push({
+            ...light,
+            value: 0, // Đèn CLOSE tắt (0%) trong scene OPEN
+          });
+        });
+      }
+
+      // Sắp xếp đèn theo group
+      openSceneLights.sort((a, b) => a.group - b.group);
+
+      // Thêm scene OPEN mới
+      if (openSceneLights.length > 0) {
+        const openName = cabinetIndex
+          ? `OPEN ${number} ${cabinetIndex}`
+          : `OPEN ${number}`;
+        scenes.push({
+          name: openName,
+          amount: openSceneLights.length,
+          lights: openSceneLights,
+          isSequential: false,
+        });
+      }
+
+      // Tạo danh sách đèn cho scene CLOSE
+      const closeSceneLights: Light[] = [];
+
+      // Thêm đèn OPEN với độ sáng 0%
+      if (hasOpenLights) {
+        lightsObj.open.forEach((light) => {
+          closeSceneLights.push({
+            ...light,
+            value: 0, // Đèn OPEN tắt (0%) trong scene CLOSE
+          });
+        });
+      }
+
+      // Thêm đèn CLOSE với độ sáng 100%
+      if (hasCloseLights) {
+        lightsObj.close.forEach((light) => {
+          closeSceneLights.push({
+            ...light,
+            value: 100, // Đèn CLOSE sáng 100% trong scene CLOSE
+          });
+        });
+      }
+
+      // Sắp xếp đèn theo group
+      closeSceneLights.sort((a, b) => a.group - b.group);
+
+      // Thêm scene CLOSE mới
+      if (closeSceneLights.length > 0) {
+        const closeName = cabinetIndex
+          ? `CLOSE ${number} ${cabinetIndex}`
+          : `CLOSE ${number}`;
+        scenes.push({
+          name: closeName,
+          amount: closeSceneLights.length,
+          lights: closeSceneLights,
+          isSequential: false,
+        });
+      }
+    }
+  });
+
+  return scenes;
+}
+
+/**
+ * Cấu hình CSV parser
+ */
+const CSV_PARSER_OPTIONS = {
+  skipLines: 0,
+  headers: false,
+  skipComments: true,
+};
+
+/**
+ * Parse CSV content and convert it to scenes and schedules
+ * @param csvContent The CSV file content as string
+ * @param separateCabinets Whether to process each cabinet separately
+ * @returns Object containing scenes and schedules
+ */
+export function parseCSV(
+  csvContent: string,
+  separateCabinets: boolean = false
+): Promise<{
+  scenes: Scene[];
+  schedules: Schedule[];
+}> {
+  return new Promise((resolve, reject) => {
+    // Kiểm tra nội dung CSV
+    if (!csvContent || csvContent.trim() === "") {
+      reject(new Error("CSV content is empty"));
+      return;
+    }
+
+    try {
+      // Tạo một stream từ nội dung CSV
+      const stream = Readable.from([csvContent]);
+      const results: CSVRow[] = [];
+
+      // Sử dụng csv-parser để parse dữ liệu
+      stream
+        .pipe(csvParser(CSV_PARSER_OPTIONS))
+        .on("data", (data: CSVRow) => results.push(data))
+        .on("end", () => {
+          try {
+            // Kiểm tra kết quả parse
+            if (results.length < 5) {
+              reject(new Error("CSV file is too short or empty"));
+              return;
+            }
+
+            // Xử lý dữ liệu đã parse
+            const processedData = separateCabinets
+              ? processCSVDataWithSeparateCabinets(results)
+              : processCSVData(results);
+
+            resolve(processedData);
+          } catch (error) {
+            // Xử lý lỗi cụ thể và cung cấp thông báo lỗi rõ ràng hơn
+            if (error instanceof Error) {
+              reject(new Error(`Error processing CSV data: ${error.message}`));
+            } else {
+              reject(new Error("Unknown error processing CSV data"));
+            }
+          }
+        })
+        .on("error", (error) => {
+          reject(new Error(`Error parsing CSV: ${error.message}`));
+        });
+    } catch (error) {
+      if (error instanceof Error) {
+        reject(new Error(`Error initializing CSV parser: ${error.message}`));
+      } else {
+        reject(new Error("Unknown error initializing CSV parser"));
+      }
+    }
+  });
+}
+
+/**
+ * Tạo scenes từ dữ liệu đèn đã xử lý
+ * @param lightsByGroup Thông tin đèn theo group
+ * @param openCloseGroups Danh sách group đèn OPEN/CLOSE
+ * @param sceneNames Danh sách tên scene
+ * @returns Danh sách scene đã tạo
+ */
+function createScenesFromLightData(
+  lightsByGroup: LightsByGroup,
+  openCloseGroups: Set<number>,
+  sceneNames: string[]
+): Scene[] {
+  const scenes: Scene[] = [];
+
+  // Tạo scene cho mỗi tên scene
+  sceneNames.forEach((sceneName) => {
     const lights: Light[] = [];
 
     // Thêm đèn từ mỗi group vào scene (trừ đèn OPEN/CLOSE)
@@ -412,17 +750,64 @@ function processCSVData(rows: any[]): {
     // Sắp xếp đèn theo group
     lights.sort((a, b) => a.group - b.group);
 
-    // Cập nhật scene
-    scenes[sceneIndex].lights = lights;
-    scenes[sceneIndex].amount = lights.length;
+    // Tạo scene mới
+    const scene: Scene = {
+      name: sceneName,
+      amount: lights.length,
+      lights: [...lights],
+      isSequential: false,
+    };
+
+    // Kiểm tra xem các group có liên tục không và tất cả đèn có cùng độ sáng không
+    const isGroupContinuous = checkContinuousGroups(lights);
+
+    if (isGroupContinuous && lights.length > 0) {
+      // Nếu các group liên tục và tất cả đèn có cùng độ sáng, sử dụng mode group liên tục
+      const minGroup = Math.min(...lights.map((light) => light.group));
+      scene.isSequential = true;
+      scene.startGroup = minGroup;
+      scene.lights = [
+        {
+          name: "Đèn chưa đặt tên",
+          group: minGroup,
+          value: lights[0].value,
+        },
+      ];
+    }
+
+    scenes.push(scene);
   });
 
-  // Tạo danh sách tên các scene OPEN/CLOSE để kiểm tra trùng lặp
-  const openCloseSceneNames = new Set<string>();
-  Object.keys(openCloseLightsByNumber).forEach((number) => {
-    openCloseSceneNames.add(`OPEN ${number}`);
-    openCloseSceneNames.add(`CLOSE ${number}`);
-  });
+  return scenes;
+}
+
+/**
+ * Hàm chung để xử lý dữ liệu CSV và tạo scenes
+ * @param rows Dữ liệu CSV đã parse
+ * @param cabinetName Tên tủ (tùy chọn)
+ * @param cabinetIndex Chỉ số tủ (tùy chọn)
+ * @returns Kết quả xử lý scene
+ */
+function processCSVDataCommon(
+  rows: CSVRow[],
+  cabinetName?: string,
+  cabinetIndex?: number
+): SceneProcessingResult {
+  // Tìm thông tin về scene và thời gian
+  const { sceneNames, sceneColumns, sceneTimeInfo } = findSceneHeaderAndNames(
+    rows,
+    cabinetName
+  );
+
+  // Tìm cột chứa thông tin về group và tên đèn
+  const { groupColumn, nameColumn } = findGroupAndNameColumns(
+    rows,
+    cabinetName
+  );
+
+  // Xử lý dữ liệu đèn
+  const { lightsByGroup, openCloseLightsByNumber, openCloseGroups } =
+    processLightData(rows, groupColumn, nameColumn, sceneColumns, sceneNames);
 
   // Kiểm tra xem có scene chứa MASTER ON/OFF không
   const masterOnOffIndex = sceneNames.findIndex((name) => {
@@ -456,209 +841,109 @@ function processCSVData(rows: any[]): {
   // Sắp xếp tất cả đèn theo group
   allLights.sort((a, b) => a.group - b.group);
 
-  // Xóa tất cả các scene hiện tại
-  scenes.length = 0;
+  // Tạo danh sách scene thông thường (không bao gồm MASTER ON/OFF)
+  const regularSceneNames = sceneNames.filter(
+    (_, index) => index !== masterOnOffIndex
+  );
 
-  // Thêm lại các scene thông thường không trùng tên với scene OPEN/CLOSE và không phải MASTER ON/OFF
-  sceneNames.forEach((name, index) => {
-    // Bỏ qua scene OPEN/CLOSE và MASTER ON/OFF
-    if (openCloseSceneNames.has(name) || index === masterOnOffIndex) {
-      return;
-    }
+  // Tạo scenes thông thường
+  let scenes: Scene[] = [];
 
-    scenes.push({
-      name,
-      amount: 0,
-      lights: [],
-      isSequential: false,
-    });
-  });
+  // Nếu có chỉ số tủ, tạo scenes với tên bao gồm chỉ số tủ
+  if (cabinetIndex !== undefined) {
+    // Tạo scenes thông thường với tên bao gồm chỉ số tủ
+    regularSceneNames.forEach((sceneName) => {
+      const lights: Light[] = [];
 
-  // Cập nhật lại danh sách đèn cho các scene thông thường
-  scenes.forEach((scene) => {
-    const lights: Light[] = [];
+      // Thêm đèn từ mỗi group vào scene (trừ đèn OPEN/CLOSE)
+      Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
+        const group = parseInt(groupStr);
 
-    // Thêm đèn từ mỗi group vào scene (trừ đèn OPEN/CLOSE)
-    Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
-      const group = parseInt(groupStr);
+        // Bỏ qua các đèn thuộc group OPEN/CLOSE
+        if (openCloseGroups.has(group)) {
+          return;
+        }
 
-      // Bỏ qua các đèn thuộc group OPEN/CLOSE
-      if (openCloseGroups.has(group)) {
-        return;
+        const value =
+          lightInfo.values[sceneName] !== undefined
+            ? lightInfo.values[sceneName]
+            : 100;
+
+        lights.push({
+          name: lightInfo.name,
+          group,
+          value,
+        });
+      });
+
+      // Sắp xếp đèn theo group
+      lights.sort((a, b) => a.group - b.group);
+
+      // Tạo scene mới với tên bao gồm chỉ số tủ
+      const scene: Scene = {
+        name: `${sceneName} ${cabinetIndex}`,
+        amount: lights.length,
+        lights: [...lights],
+        isSequential: false,
+      };
+
+      // Kiểm tra xem các group có liên tục không và tất cả đèn có cùng độ sáng không
+      const isGroupContinuous = checkContinuousGroups(lights);
+
+      if (isGroupContinuous && lights.length > 0) {
+        // Nếu các group liên tục và tất cả đèn có cùng độ sáng, sử dụng mode group liên tục
+        const minGroup = Math.min(...lights.map((light) => light.group));
+        scene.isSequential = true;
+        scene.startGroup = minGroup;
+        scene.lights = [
+          {
+            name: DEFAULT_LIGHT_NAME,
+            group: minGroup,
+            value: lights[0].value,
+          },
+        ];
       }
 
-      const value =
-        lightInfo.values[scene.name] !== undefined
-          ? lightInfo.values[scene.name]
-          : 100;
-
-      lights.push({
-        name: lightInfo.name,
-        group,
-        value,
-      });
+      scenes.push(scene);
     });
-
-    // Sắp xếp đèn theo group
-    lights.sort((a, b) => a.group - b.group);
-
-    // Cập nhật scene
-    scene.lights = lights;
-    scene.amount = lights.length;
-
-    // Kiểm tra xem các group có liên tục không và tất cả đèn có cùng độ sáng không
-    const isGroupContinuous = checkContinuousGroups(lights);
-
-    if (isGroupContinuous && lights.length > 0) {
-      // Nếu các group liên tục và tất cả đèn có cùng độ sáng, sử dụng mode group liên tục
-      const minGroup = Math.min(...lights.map((light) => light.group));
-      scene.isSequential = true;
-      scene.startGroup = minGroup;
-      scene.lights = [
-        {
-          name: "Đèn chưa đặt tên",
-          group: minGroup,
-          value: lights[0].value,
-        },
-      ];
-    }
-  });
+  } else {
+    // Tạo scenes thông thường không có chỉ số tủ
+    scenes = createScenesFromLightData(
+      lightsByGroup,
+      openCloseGroups,
+      regularSceneNames
+    );
+  }
 
   // Nếu có scene MASTER ON/OFF, tạo hai scene MASTER ON và MASTER OFF
   if (masterOnOffIndex !== -1) {
-    // Tạo scene MASTER ON
-    if (allLights.length > 0) {
-      const masterOnLights = allLights.map((light) => ({
-        ...light,
-        value: 100, // Tất cả đèn có độ sáng 100%
-      }));
-
-      // Kiểm tra xem các group có liên tục không
-      const isGroupContinuous = checkContinuousGroups(masterOnLights);
-
-      if (isGroupContinuous) {
-        // Nếu các group liên tục, sử dụng mode group liên tục
-        const minGroup = Math.min(
-          ...masterOnLights.map((light) => light.group)
-        );
-        scenes.push({
-          name: "MASTER ON",
-          amount: masterOnLights.length,
-          lights: [{ name: "Đèn chưa đặt tên", group: minGroup, value: 100 }],
-          isSequential: true,
-          startGroup: minGroup,
-        });
-      } else {
-        // Nếu các group không liên tục, sử dụng mode thông thường
-        scenes.push({
-          name: "MASTER ON",
-          amount: masterOnLights.length,
-          lights: masterOnLights,
-          isSequential: false,
-        });
-      }
-    }
-
-    // Tạo scene MASTER OFF
-    if (allLights.length > 0) {
-      const masterOffLights = allLights.map((light) => ({
-        ...light,
-        value: 0, // Tất cả đèn có độ sáng 0%
-      }));
-
-      // Kiểm tra xem các group có liên tục không
-      const isGroupContinuous = checkContinuousGroups(masterOffLights);
-
-      if (isGroupContinuous) {
-        // Nếu các group liên tục, sử dụng mode group liên tục
-        const minGroup = Math.min(
-          ...masterOffLights.map((light) => light.group)
-        );
-        scenes.push({
-          name: "MASTER OFF",
-          amount: masterOffLights.length,
-          lights: [{ name: "Đèn chưa đặt tên", group: minGroup, value: 0 }],
-          isSequential: true,
-          startGroup: minGroup,
-        });
-      } else {
-        // Nếu các group không liên tục, sử dụng mode thông thường
-        scenes.push({
-          name: "MASTER OFF",
-          amount: masterOffLights.length,
-          lights: masterOffLights,
-          isSequential: false,
-        });
-      }
-    }
+    const masterScenes = createMasterScenes(allLights, cabinetIndex);
+    scenes.push(...masterScenes);
   }
 
   // Tạo các scene OPEN/CLOSE
-  Object.entries(openCloseLightsByNumber).forEach(([number, lightsObj]) => {
-    // Tạo danh sách đèn cho scene OPEN
-    const openSceneLights: Light[] = [];
+  const openCloseScenes = createOpenCloseScenes(
+    openCloseLightsByNumber,
+    cabinetIndex
+  );
+  scenes.push(...openCloseScenes);
 
-    // Thêm đèn OPEN với độ sáng 100%
-    lightsObj.open.forEach((light) => {
-      openSceneLights.push({
-        ...light,
-        value: 100, // Đèn OPEN sáng 100% trong scene OPEN
-      });
-    });
+  return { scenes, sceneTimeInfo };
+}
 
-    // Thêm đèn CLOSE với độ sáng 0%
-    lightsObj.close.forEach((light) => {
-      openSceneLights.push({
-        ...light,
-        value: 0, // Đèn CLOSE tắt (0%) trong scene OPEN
-      });
-    });
+/**
+ * Xử lý dữ liệu CSV đã parse
+ */
+function processCSVData(rows: CSVRow[]): {
+  scenes: Scene[];
+  schedules: Schedule[];
+} {
+  if (rows.length < 5) {
+    throw new Error("CSV file is too short or empty");
+  }
 
-    // Sắp xếp đèn theo group
-    openSceneLights.sort((a, b) => a.group - b.group);
-
-    // Thêm scene OPEN mới
-    if (openSceneLights.length > 0) {
-      scenes.push({
-        name: `OPEN ${number}`,
-        amount: openSceneLights.length,
-        lights: openSceneLights,
-        isSequential: false,
-      });
-    }
-
-    // Tạo danh sách đèn cho scene CLOSE
-    const closeSceneLights: Light[] = [];
-
-    // Thêm đèn OPEN với độ sáng 0%
-    lightsObj.open.forEach((light) => {
-      closeSceneLights.push({
-        ...light,
-        value: 0, // Đèn OPEN tắt (0%) trong scene CLOSE
-      });
-    });
-
-    // Thêm đèn CLOSE với độ sáng 100%
-    lightsObj.close.forEach((light) => {
-      closeSceneLights.push({
-        ...light,
-        value: 100, // Đèn CLOSE sáng 100% trong scene CLOSE
-      });
-    });
-
-    // Sắp xếp đèn theo group
-    closeSceneLights.sort((a, b) => a.group - b.group);
-
-    // Thêm scene CLOSE mới
-    if (closeSceneLights.length > 0) {
-      scenes.push({
-        name: `CLOSE ${number}`,
-        amount: closeSceneLights.length,
-        lights: closeSceneLights,
-        isSequential: false,
-      });
-    }
-  });
+  // Sử dụng hàm chung để xử lý dữ liệu
+  const { scenes, sceneTimeInfo } = processCSVDataCommon(rows);
 
   // Tạo schedules bằng cách sử dụng thông tin thời gian từ CSV
   const schedules: Schedule[] = createSchedulesFromScenes(
@@ -669,33 +954,36 @@ function processCSVData(rows: any[]): {
   return { scenes, schedules };
 }
 
-/**
- * Xử lý dữ liệu CSV đã parse với chế độ tủ riêng biệt
- * @param rows Dữ liệu CSV đã parse
- * @returns Object chứa scenes và schedules
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function processCSVDataWithSeparateCabinets(rows: any[]): {
-  scenes: Scene[];
-  schedules: Schedule[];
-} {
-  if (rows.length < 5) {
-    throw new Error("CSV file is too short or empty");
-  }
+// Cached cabinet header keywords
+const CABINET_HEADER_KEYWORDS = ["TỦ ĐIỆN", "TU DIEN"];
+const CABINET_NAME_PATTERN = "DMX-";
 
-  // Tìm tất cả các header của tủ điện
+/**
+ * Tìm tất cả các header của tủ điện trong CSV
+ * @param rows Dữ liệu CSV đã parse
+ * @returns Danh sách header của tủ điện
+ */
+function findCabinetHeaders(
+  rows: CSVRow[]
+): { name: string; startRow: number }[] {
   const cabinetHeaders: { name: string; startRow: number }[] = [];
+  const DEFAULT_CABINET_NAME = "Tủ không tên";
 
   for (let i = 0; i < rows.length; i++) {
     const rowValues = Object.values(rows[i]);
-    const rowStr = rowValues.join(",");
+    const rowStr = rowValues.join(",").toUpperCase();
 
-    if (rowStr.includes("TỦ ĐIỆN") || rowStr.includes("TU DIEN")) {
-      let cabinetName = "Tủ không tên";
+    // Kiểm tra xem dòng có chứa từ khóa header tủ không
+    if (CABINET_HEADER_KEYWORDS.some((keyword) => rowStr.includes(keyword))) {
+      let cabinetName = DEFAULT_CABINET_NAME;
 
-      // Lấy tên tủ từ dòng header
+      // Tìm tên tủ từ dòng header
       for (const value of rowValues) {
-        if (value && typeof value === "string" && value.includes("DMX-")) {
+        if (
+          value &&
+          typeof value === "string" &&
+          value.includes(CABINET_NAME_PATTERN)
+        ) {
           cabinetName = value.trim();
           break;
         }
@@ -708,62 +996,68 @@ function processCSVDataWithSeparateCabinets(rows: any[]): {
     }
   }
 
+  return cabinetHeaders;
+}
+
+/**
+ * Xử lý dữ liệu CSV đã parse với chế độ tủ riêng biệt
+ * @param rows Dữ liệu CSV đã parse
+ * @returns Object chứa scenes và schedules
+ */
+function processCSVDataWithSeparateCabinets(rows: CSVRow[]): {
+  scenes: Scene[];
+  schedules: Schedule[];
+} {
+  if (rows.length < 5) {
+    throw new Error("CSV file is too short or empty");
+  }
+
+  // Tìm tất cả các header của tủ điện
+  const cabinetHeaders = findCabinetHeaders(rows);
+
   if (cabinetHeaders.length === 0) {
     throw new Error("Không tìm thấy thông tin tủ điện trong file CSV");
   }
 
   // Xác định phạm vi dữ liệu cho mỗi tủ
-  const cabinets: {
-    name: string;
-    startRow: number;
-    endRow: number;
-    scenes: Scene[];
-  }[] = [];
-
-  for (let i = 0; i < cabinetHeaders.length; i++) {
+  const cabinets = cabinetHeaders.map((header, index) => {
     const endRow =
-      i < cabinetHeaders.length - 1
-        ? cabinetHeaders[i + 1].startRow - 1
+      index < cabinetHeaders.length - 1
+        ? cabinetHeaders[index + 1].startRow - 1
         : rows.length - 1;
 
-    cabinets.push({
-      name: cabinetHeaders[i].name,
-      startRow: cabinetHeaders[i].startRow,
+    return {
+      name: header.name,
+      startRow: header.startRow,
       endRow: endRow,
-      scenes: [],
-    });
-  }
+    };
+  });
 
   // Xử lý dữ liệu cho từng tủ
-  const allSceneTimeInfo: { [key: string]: { hour: number; minute: number } } =
-    {};
+  const allSceneTimeInfo: SceneTimeInfo = {};
+  const allScenes: Scene[] = [];
 
-  for (let i = 0; i < cabinets.length; i++) {
-    const cabinet = cabinets[i];
+  // Xử lý từng tủ
+  cabinets.forEach((cabinet, index) => {
+    const cabinetIndex = index + 1; // 1-based index
     const cabinetRows = rows.slice(cabinet.startRow, cabinet.endRow + 1);
 
     // Xử lý dữ liệu của tủ hiện tại
-    const cabinetData = processCSVDataForCabinet(
+    const { scenes, sceneTimeInfo } = processCSVDataForCabinet(
       cabinetRows,
       cabinet.name,
-      i + 1
+      cabinetIndex
     );
-    cabinet.scenes = cabinetData.scenes;
 
-    // Lưu thông tin thời gian của scene
+    // Thêm scenes vào danh sách tổng
+    allScenes.push(...scenes);
+
+    // Thêm thông tin thời gian vào map tổng
     // Chuyển đổi tên scene gốc thành tên scene có chỉ số tủ
-    Object.entries(cabinetData.sceneTimeInfo).forEach(
-      ([sceneName, timeInfo]) => {
-        const sceneNameWithIndex = `${sceneName} ${i + 1}`;
-        allSceneTimeInfo[sceneNameWithIndex] = timeInfo;
-      }
-    );
-  }
-
-  // Gộp tất cả các scene từ các tủ
-  const allScenes: Scene[] = [];
-  cabinets.forEach((cabinet) => {
-    allScenes.push(...cabinet.scenes);
+    Object.entries(sceneTimeInfo).forEach(([sceneName, timeInfo]) => {
+      const sceneNameWithIndex = `${sceneName} ${cabinetIndex}`;
+      allSceneTimeInfo[sceneNameWithIndex] = timeInfo;
+    });
   });
 
   // Tạo schedules chỉ cho những scene có thông tin thời gian
@@ -783,595 +1077,12 @@ function processCSVDataWithSeparateCabinets(rows: any[]): {
  * @returns Object chứa scenes của tủ
  */
 function processCSVDataForCabinet(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  rows: any[],
+  rows: CSVRow[],
   cabinetName: string,
   cabinetIndex: number
-): {
-  scenes: Scene[];
-  sceneTimeInfo: { [key: string]: { hour: number; minute: number } };
-} {
-  // Tìm hàng chứa thông tin về scene
-  let sceneHeaderRow = -1;
-  let sceneNameRow = -1;
-
-  for (let i = 0; i < Math.min(10, rows.length); i++) {
-    const rowValues = Object.values(rows[i]);
-    const rowStr = rowValues.join(",");
-
-    if (rowStr.includes("SCENE SETTING") || rowStr.includes("SCENE OVERIDE")) {
-      sceneHeaderRow = i;
-      sceneNameRow = i + 1;
-      break;
-    }
-  }
-
-  if (sceneHeaderRow === -1 || sceneNameRow === -1) {
-    throw new Error(`Không tìm thấy thông tin scene trong tủ ${cabinetName}`);
-  }
-
-  // Tìm các cột chứa tên scene
-  const sceneColumns: { [key: string]: number } = {};
-  const sceneNames: string[] = [];
-  const sceneTimeInfo: { [key: string]: { hour: number; minute: number } } = {};
-
-  Object.entries(rows[sceneNameRow]).forEach(([key, value]) => {
-    if (
-      value &&
-      typeof value === "string" &&
-      value.trim() !== "" &&
-      !value.includes(":")
-    ) {
-      const sceneName = value.trim();
-      const colIndex = parseInt(key);
-      sceneColumns[sceneName] = colIndex;
-      sceneNames.push(sceneName);
-
-      // Kiểm tra dòng tiếp theo để lấy thông tin thời gian
-      if (sceneNameRow + 1 < rows.length) {
-        const timeValue = rows[sceneNameRow + 1][colIndex];
-        if (timeValue && typeof timeValue === "string") {
-          // Tìm kiếm định dạng thời gian (ví dụ: "6:00", "18:00")
-          const timeMatch = timeValue.match(/(\d+):(\d+)/);
-          if (timeMatch) {
-            const hour = parseInt(timeMatch[1]);
-            const minute = parseInt(timeMatch[2]);
-            if (!isNaN(hour) && !isNaN(minute)) {
-              sceneTimeInfo[sceneName] = { hour, minute };
-            }
-          }
-        }
-      }
-    }
-  });
-
-  if (sceneNames.length === 0) {
-    throw new Error(`Không tìm thấy tên scene trong tủ ${cabinetName}`);
-  }
-
-  // Tìm cột chứa thông tin về group và tên đèn
-  let groupColumn = -1;
-  let nameColumn = -1;
-
-  for (let i = 0; i < Math.min(10, rows.length); i++) {
-    Object.entries(rows[i]).forEach(([key, value]) => {
-      if (value && typeof value === "string") {
-        const valueStr = value.toString().toUpperCase();
-
-        if (valueStr.includes("GROUP") || valueStr.includes("ĐỊA CHỈ")) {
-          groupColumn = parseInt(key);
-        }
-
-        if (valueStr.includes("TÊN LỘ") || valueStr.includes("TEN LO")) {
-          nameColumn = parseInt(key);
-        }
-      }
-    });
-
-    if (groupColumn !== -1) {
-      break;
-    }
-  }
-
-  if (groupColumn === -1) {
-    throw new Error(`Không tìm thấy cột Group trong tủ ${cabinetName}`);
-  }
-
-  // Tạo scenes với tên bao gồm chỉ số tủ
-  const scenes: Scene[] = sceneNames.map((name) => ({
-    name: `${name} ${cabinetIndex}`,
-    amount: 0,
-    lights: [],
-    isSequential: false,
-  }));
-
-  // Xử lý từng dòng để lấy thông tin đèn
-  const lightsByGroup: {
-    [key: number]: { name: string; values: { [key: string]: number } };
-  } = {};
-
-  // Lưu trữ đèn OPEN và CLOSE theo số
-  const openCloseLightsByNumber: {
-    [key: string]: { open: Light[]; close: Light[] };
-  } = {};
-
-  // Lưu trữ danh sách các group đèn OPEN/CLOSE để loại bỏ khỏi scene thông thường
-  const openCloseGroups = new Set<number>();
-
-  // Lưu trữ danh sách các group đã xuất hiện để kiểm tra trùng lặp
-  const groupCounts: { [key: number]: number } = {};
-
-  // Đầu tiên, đếm số lần xuất hiện của mỗi group
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-
-    // Bỏ qua các dòng không có thông tin group
-    if (
-      !row[groupColumn] ||
-      !row[groupColumn].toString().toUpperCase().includes("GROUP")
-    ) {
-      continue;
-    }
-
-    // Lấy số group
-    const groupMatch = row[groupColumn].toString().match(/GROUP\s*(\d+)/i);
-    if (!groupMatch) {
-      continue;
-    }
-
-    const groupNumber = parseInt(groupMatch[1]);
-
-    // Lấy tên đèn
-    let lightName = "Đèn chưa đặt tên";
-    if (
-      nameColumn !== -1 &&
-      row[nameColumn] &&
-      row[nameColumn].toString().trim() !== ""
-    ) {
-      lightName = row[nameColumn].toString().trim();
-    }
-
-    // Kiểm tra xem đèn có phải là OPEN hoặc CLOSE không
-    const isOpenLight = lightName.toUpperCase().startsWith("OPEN");
-    const isCloseLight = lightName.toUpperCase().startsWith("CLOSE");
-
-    // Không đếm đèn OPEN/CLOSE
-    if (isOpenLight || isCloseLight) {
-      continue;
-    }
-
-    // Tăng số lần xuất hiện của group
-    groupCounts[groupNumber] = (groupCounts[groupNumber] || 0) + 1;
-  }
-
-  // Sau đó, xử lý từng dòng để lấy thông tin đèn
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
-
-    // Bỏ qua các dòng không có thông tin group
-    if (
-      !row[groupColumn] ||
-      !row[groupColumn].toString().toUpperCase().includes("GROUP")
-    ) {
-      continue;
-    }
-
-    // Lấy số group
-    const groupMatch = row[groupColumn].toString().match(/GROUP\s+(\d+)/i);
-    if (!groupMatch) {
-      continue;
-    }
-
-    const groupNumber = parseInt(groupMatch[1]);
-    const groupName = `Group ${groupNumber}`;
-
-    // Lấy tên đèn
-    let lightName = "Đèn chưa đặt tên";
-    if (
-      nameColumn !== -1 &&
-      row[nameColumn] &&
-      row[nameColumn].toString().trim() !== ""
-    ) {
-      lightName = row[nameColumn].toString().trim();
-    }
-
-    // Kiểm tra xem đèn có phải là OPEN hoặc CLOSE không
-    const isOpenLight = lightName.toUpperCase().startsWith("OPEN");
-    const isCloseLight = lightName.toUpperCase().startsWith("CLOSE");
-
-    // Xác định số của OPEN/CLOSE (ví dụ: OPEN 1 -> 1)
-    let openCloseNumber = "";
-    if (isOpenLight || isCloseLight) {
-      const match = lightName.match(/\d+/);
-      if (match) {
-        openCloseNumber = match[0];
-      }
-    }
-
-    // Lấy giá trị độ sáng cho từng scene
-    const sceneValues: { [key: string]: number } = {};
-
-    sceneNames.forEach((sceneName) => {
-      const colIndex = sceneColumns[sceneName];
-
-      // Kiểm tra xem cột có tồn tại không
-      if (colIndex !== undefined) {
-        // Lấy giá trị từ cột, xử lý cả trường hợp giá trị là 0
-        const cellValue = row[colIndex];
-        let value = "";
-
-        // Kiểm tra xem giá trị có tồn tại không (bao gồm cả 0)
-        if (cellValue !== undefined && cellValue !== null) {
-          value = cellValue.toString().trim();
-        }
-
-        // Chuyển đổi giá trị
-        if (value.toLowerCase() === "on" || value.toLowerCase() === "on/off") {
-          value = "100";
-        } else if (value.toLowerCase() === "off") {
-          value = "0";
-        } else {
-          // Loại bỏ dấu phần trăm
-          value = value.replace(/%/g, "");
-        }
-
-        // Mặc định là 100 nếu trống
-        if (value === "") {
-          value = "100";
-        }
-
-        // Chuyển đổi thành số
-        const brightness = parseInt(value);
-
-        // Kiểm tra giá trị hợp lệ
-        if (!isNaN(brightness) && brightness >= 0 && brightness <= 100) {
-          sceneValues[sceneName] = brightness;
-        } else {
-          sceneValues[sceneName] = 100; // Giá trị mặc định
-        }
-      } else {
-        sceneValues[sceneName] = 100; // Giá trị mặc định
-      }
-    });
-
-    // Xử lý đèn OPEN/CLOSE
-    if ((isOpenLight || isCloseLight) && openCloseNumber) {
-      // Tạo key dựa trên số của đèn OPEN/CLOSE
-      const numberKey = openCloseNumber;
-
-      // Khởi tạo cấu trúc lưu trữ nếu chưa tồn tại
-      if (!openCloseLightsByNumber[numberKey]) {
-        openCloseLightsByNumber[numberKey] = {
-          open: [],
-          close: [],
-        };
-      }
-
-      // Thêm đèn vào danh sách tương ứng (open hoặc close)
-      const light: Light = {
-        name: lightName,
-        group: groupNumber,
-        value: 100, // Giá trị mặc định, sẽ được điều chỉnh khi tạo scene
-      };
-
-      if (isOpenLight) {
-        openCloseLightsByNumber[numberKey].open.push(light);
-      } else {
-        openCloseLightsByNumber[numberKey].close.push(light);
-      }
-
-      // Thêm group vào danh sách các group đèn OPEN/CLOSE
-      openCloseGroups.add(groupNumber);
-    } else {
-      // Kiểm tra xem group có trùng lặp không
-      const isDuplicateGroup = groupCounts[groupNumber] > 1;
-
-      // Lưu thông tin đèn thông thường theo group (không phải OPEN/CLOSE)
-      lightsByGroup[groupNumber] = {
-        // Nếu group trùng lặp, sử dụng tên group, ngược lại sử dụng tên đèn gốc
-        name: isDuplicateGroup ? groupName : lightName,
-        values: sceneValues,
-      };
-    }
-  }
-
-  // Tạo danh sách đèn cho từng scene
-  scenes.forEach((scene, sceneIndex) => {
-    const originalSceneName = sceneNames[sceneIndex];
-    const lights: Light[] = [];
-
-    // Thêm đèn từ mỗi group vào scene (trừ đèn OPEN/CLOSE)
-    Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
-      const group = parseInt(groupStr);
-
-      // Bỏ qua các đèn thuộc group OPEN/CLOSE
-      if (openCloseGroups.has(group)) {
-        return;
-      }
-
-      const value =
-        lightInfo.values[originalSceneName] !== undefined
-          ? lightInfo.values[originalSceneName]
-          : 100;
-
-      lights.push({
-        name: lightInfo.name,
-        group,
-        value,
-      });
-    });
-
-    // Sắp xếp đèn theo group
-    lights.sort((a, b) => a.group - b.group);
-
-    // Cập nhật scene
-    scene.lights = lights;
-    scene.amount = lights.length;
-
-    // Kiểm tra xem các group có liên tục không và tất cả đèn có cùng độ sáng không
-    const isGroupContinuous = checkContinuousGroups(lights);
-
-    if (isGroupContinuous && lights.length > 0) {
-      // Nếu các group liên tục và tất cả đèn có cùng độ sáng, sử dụng mode group liên tục
-      const minGroup = Math.min(...lights.map((light) => light.group));
-      scene.isSequential = true;
-      scene.startGroup = minGroup;
-      scene.lights = [
-        {
-          name: "Đèn chưa đặt tên",
-          group: minGroup,
-          value: lights[0].value,
-        },
-      ];
-    }
-  });
-
-  // Tạo danh sách tên các scene OPEN/CLOSE để kiểm tra trùng lặp
-  const openCloseSceneNames = new Set<string>();
-  Object.keys(openCloseLightsByNumber).forEach((number) => {
-    openCloseSceneNames.add(`OPEN ${number}`);
-    openCloseSceneNames.add(`CLOSE ${number}`);
-  });
-
-  // Kiểm tra xem có scene chứa MASTER ON/OFF không
-  const masterOnOffIndex = sceneNames.findIndex((name) => {
-    const upperName = name.toUpperCase();
-    return (
-      upperName.includes("MASTER ON/OFF") ||
-      upperName.includes("MASTER ON-OFF") ||
-      upperName.includes("MASTER ON OFF")
-    );
-  });
-
-  // Tạo danh sách tất cả các đèn (không bao gồm OPEN/CLOSE)
-  const allLights: Light[] = [];
-
-  // Thêm đèn từ lightsByGroup (không bao gồm OPEN/CLOSE)
-  Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
-    const group = parseInt(groupStr);
-
-    // Bỏ qua các đèn thuộc group OPEN/CLOSE
-    if (openCloseGroups.has(group)) {
-      return;
-    }
-
-    allLights.push({
-      name: lightInfo.name,
-      group,
-      value: 100, // Giá trị mặc định, sẽ được thay đổi sau
-    });
-  });
-
-  // Sắp xếp tất cả đèn theo group
-  allLights.sort((a, b) => a.group - b.group);
-
-  // Xóa tất cả các scene hiện tại
-  scenes.length = 0;
-
-  // Thêm lại các scene thông thường không trùng tên với scene OPEN/CLOSE và không phải MASTER ON/OFF
-  sceneNames.forEach((name, index) => {
-    // Bỏ qua scene OPEN/CLOSE và MASTER ON/OFF
-    if (openCloseSceneNames.has(name) || index === masterOnOffIndex) {
-      return;
-    }
-
-    scenes.push({
-      name: `${name} ${cabinetIndex}`,
-      amount: 0,
-      lights: [],
-      isSequential: false,
-    });
-  });
-
-  // Cập nhật lại danh sách đèn cho các scene thông thường
-  scenes.forEach((scene) => {
-    // Lấy tên scene gốc (không có chỉ số tủ)
-    const originalSceneName = scene.name.replace(` ${cabinetIndex}`, "");
-    const lights: Light[] = [];
-
-    // Thêm đèn từ mỗi group vào scene (trừ đèn OPEN/CLOSE)
-    Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
-      const group = parseInt(groupStr);
-
-      // Bỏ qua các đèn thuộc group OPEN/CLOSE
-      if (openCloseGroups.has(group)) {
-        return;
-      }
-
-      const value =
-        lightInfo.values[originalSceneName] !== undefined
-          ? lightInfo.values[originalSceneName]
-          : 100;
-
-      lights.push({
-        name: lightInfo.name,
-        group,
-        value,
-      });
-    });
-
-    // Sắp xếp đèn theo group
-    lights.sort((a, b) => a.group - b.group);
-
-    // Cập nhật scene
-    scene.lights = lights;
-    scene.amount = lights.length;
-
-    // Kiểm tra xem các group có liên tục không và tất cả đèn có cùng độ sáng không
-    const isGroupContinuous = checkContinuousGroups(lights);
-
-    if (isGroupContinuous && lights.length > 0) {
-      // Nếu các group liên tục và tất cả đèn có cùng độ sáng, sử dụng mode group liên tục
-      const minGroup = Math.min(...lights.map((light) => light.group));
-      scene.isSequential = true;
-      scene.startGroup = minGroup;
-      scene.lights = [
-        {
-          name: "Đèn chưa đặt tên",
-          group: minGroup,
-          value: lights[0].value,
-        },
-      ];
-    }
-  });
-
-  // Nếu có scene MASTER ON/OFF, tạo hai scene MASTER ON và MASTER OFF
-  if (masterOnOffIndex !== -1) {
-    // Tạo scene MASTER ON
-    if (allLights.length > 0) {
-      const masterOnLights = allLights.map((light) => ({
-        ...light,
-        value: 100, // Tất cả đèn có độ sáng 100%
-      }));
-
-      // Kiểm tra xem các group có liên tục không
-      const isGroupContinuous = checkContinuousGroups(masterOnLights);
-
-      if (isGroupContinuous) {
-        // Nếu các group liên tục, sử dụng mode group liên tục
-        const minGroup = Math.min(
-          ...masterOnLights.map((light) => light.group)
-        );
-        scenes.push({
-          name: `MASTER ON ${cabinetIndex}`,
-          amount: masterOnLights.length,
-          lights: [{ name: "Đèn chưa đặt tên", group: minGroup, value: 100 }],
-          isSequential: true,
-          startGroup: minGroup,
-        });
-      } else {
-        // Nếu các group không liên tục, sử dụng mode thông thường
-        scenes.push({
-          name: `MASTER ON ${cabinetIndex}`,
-          amount: masterOnLights.length,
-          lights: masterOnLights,
-          isSequential: false,
-        });
-      }
-    }
-
-    // Tạo scene MASTER OFF
-    if (allLights.length > 0) {
-      const masterOffLights = allLights.map((light) => ({
-        ...light,
-        value: 0, // Tất cả đèn có độ sáng 0%
-      }));
-
-      // Kiểm tra xem các group có liên tục không
-      const isGroupContinuous = checkContinuousGroups(masterOffLights);
-
-      if (isGroupContinuous) {
-        // Nếu các group liên tục, sử dụng mode group liên tục
-        const minGroup = Math.min(
-          ...masterOffLights.map((light) => light.group)
-        );
-        scenes.push({
-          name: `MASTER OFF ${cabinetIndex}`,
-          amount: masterOffLights.length,
-          lights: [{ name: "Đèn chưa đặt tên", group: minGroup, value: 0 }],
-          isSequential: true,
-          startGroup: minGroup,
-        });
-      } else {
-        // Nếu các group không liên tục, sử dụng mode thông thường
-        scenes.push({
-          name: `MASTER OFF ${cabinetIndex}`,
-          amount: masterOffLights.length,
-          lights: masterOffLights,
-          isSequential: false,
-        });
-      }
-    }
-  }
-
-  // Tạo các scene OPEN/CLOSE
-  Object.entries(openCloseLightsByNumber).forEach(([number, lightsObj]) => {
-    // Tạo danh sách đèn cho scene OPEN
-    const openSceneLights: Light[] = [];
-
-    // Thêm đèn OPEN với độ sáng 100%
-    lightsObj.open.forEach((light) => {
-      openSceneLights.push({
-        ...light,
-        value: 100, // Đèn OPEN sáng 100% trong scene OPEN
-      });
-    });
-
-    // Thêm đèn CLOSE với độ sáng 0%
-    lightsObj.close.forEach((light) => {
-      openSceneLights.push({
-        ...light,
-        value: 0, // Đèn CLOSE tắt (0%) trong scene OPEN
-      });
-    });
-
-    // Sắp xếp đèn theo group
-    openSceneLights.sort((a, b) => a.group - b.group);
-
-    // Thêm scene OPEN mới
-    if (openSceneLights.length > 0) {
-      scenes.push({
-        name: `OPEN ${number} ${cabinetIndex}`,
-        amount: openSceneLights.length,
-        lights: openSceneLights,
-        isSequential: false,
-      });
-    }
-
-    // Tạo danh sách đèn cho scene CLOSE
-    const closeSceneLights: Light[] = [];
-
-    // Thêm đèn OPEN với độ sáng 0%
-    lightsObj.open.forEach((light) => {
-      closeSceneLights.push({
-        ...light,
-        value: 0, // Đèn OPEN tắt (0%) trong scene CLOSE
-      });
-    });
-
-    // Thêm đèn CLOSE với độ sáng 100%
-    lightsObj.close.forEach((light) => {
-      closeSceneLights.push({
-        ...light,
-        value: 100, // Đèn CLOSE sáng 100% trong scene CLOSE
-      });
-    });
-
-    // Sắp xếp đèn theo group
-    closeSceneLights.sort((a, b) => a.group - b.group);
-
-    // Thêm scene CLOSE mới
-    if (closeSceneLights.length > 0) {
-      scenes.push({
-        name: `CLOSE ${number} ${cabinetIndex}`,
-        amount: closeSceneLights.length,
-        lights: closeSceneLights,
-        isSequential: false,
-      });
-    }
-  });
-
-  return { scenes, sceneTimeInfo };
+): SceneProcessingResult {
+  // Sử dụng hàm chung để xử lý dữ liệu
+  return processCSVDataCommon(rows, cabinetName, cabinetIndex);
 }
 
 /**

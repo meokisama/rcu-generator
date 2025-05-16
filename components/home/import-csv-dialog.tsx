@@ -73,9 +73,9 @@ export default function ImportCSVDialog({
                   Điều khiển tủ riêng biệt
                 </Label>
                 <p className="text-sm text-muted-foreground">
-                  Mỗi tủ sẽ có các scene riêng (ví dụ: "DAY TIME 1" cho tủ 1,
-                  "DAY TIME 2" cho tủ 2, v.v.), nhưng các schedule vẫn sẽ bao
-                  gồm tất cả các scene tương ứng.
+                  Mỗi tủ sẽ có các scene riêng (ví dụ: &quot;DAY TIME 1&quot;
+                  cho tủ 1, &quot;DAY TIME 2&quot; cho tủ 2, v.v.), nhưng các
+                  schedule vẫn sẽ bao gồm tất cả các scene tương ứng.
                 </p>
               </div>
             </div>
