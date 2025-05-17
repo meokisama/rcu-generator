@@ -446,17 +446,20 @@ function processLightData(
 /**
  * Tạo scene MASTER ON và MASTER OFF
  * @param allLights Danh sách tất cả đèn
- * @param cabinetIndex Chỉ số tủ (tùy chọn)
+ * @param cabinetName Tên tủ (tùy chọn)
  * @returns Danh sách scene MASTER ON và MASTER OFF
  */
-function createMasterScenes(
-  allLights: Light[],
-  cabinetIndex?: number
-): Scene[] {
+function createMasterScenes(allLights: Light[], cabinetName?: string): Scene[] {
   const scenes: Scene[] = [];
 
   if (allLights.length === 0) {
     return scenes;
+  }
+
+  // Sử dụng tên đầy đủ của tủ trong ngoặc đơn (ví dụ: (DMX-LT-GYM))
+  let cabinetSuffix = "";
+  if (cabinetName) {
+    cabinetSuffix = ` (${cabinetName})`;
   }
 
   // Tạo scene MASTER ON
@@ -467,7 +470,7 @@ function createMasterScenes(
 
   // Kiểm tra xem các group có liên tục không
   const isOnGroupContinuous = checkContinuousGroups(masterOnLights);
-  const masterOnName = cabinetIndex ? `MASTER ON ${cabinetIndex}` : "MASTER ON";
+  const masterOnName = `MASTER ON${cabinetSuffix}`;
 
   if (isOnGroupContinuous) {
     // Nếu các group liên tục, sử dụng mode group liên tục
@@ -497,9 +500,7 @@ function createMasterScenes(
 
   // Kiểm tra xem các group có liên tục không
   const isOffGroupContinuous = checkContinuousGroups(masterOffLights);
-  const masterOffName = cabinetIndex
-    ? `MASTER OFF ${cabinetIndex}`
-    : "MASTER OFF";
+  const masterOffName = `MASTER OFF${cabinetSuffix}`;
 
   if (isOffGroupContinuous) {
     // Nếu các group liên tục, sử dụng mode group liên tục
@@ -527,14 +528,20 @@ function createMasterScenes(
 /**
  * Tạo các scene OPEN/CLOSE
  * @param openCloseLightsByNumber Thông tin đèn OPEN/CLOSE
- * @param cabinetIndex Chỉ số tủ (tùy chọn)
+ * @param cabinetName Tên tủ (tùy chọn)
  * @returns Danh sách scene OPEN/CLOSE
  */
 function createOpenCloseScenes(
   openCloseLightsByNumber: OpenCloseLights,
-  cabinetIndex?: number
+  cabinetName?: string
 ): Scene[] {
   const scenes: Scene[] = [];
+
+  // Sử dụng tên đầy đủ của tủ trong ngoặc đơn (ví dụ: (DMX-LT-GYM))
+  let cabinetSuffix = "";
+  if (cabinetName) {
+    cabinetSuffix = ` (${cabinetName})`;
+  }
 
   Object.entries(openCloseLightsByNumber).forEach(([number, lightsObj]) => {
     // Kiểm tra xem có cả đèn OPEN và CLOSE không
@@ -571,9 +578,7 @@ function createOpenCloseScenes(
 
       // Thêm scene OPEN mới
       if (openSceneLights.length > 0) {
-        const openName = cabinetIndex
-          ? `OPEN ${number} ${cabinetIndex}`
-          : `OPEN ${number}`;
+        const openName = `OPEN ${number}${cabinetSuffix}`;
         scenes.push({
           name: openName,
           amount: openSceneLights.length,
@@ -610,9 +615,7 @@ function createOpenCloseScenes(
 
       // Thêm scene CLOSE mới
       if (closeSceneLights.length > 0) {
-        const closeName = cabinetIndex
-          ? `CLOSE ${number} ${cabinetIndex}`
-          : `CLOSE ${number}`;
+        const closeName = `CLOSE ${number}${cabinetSuffix}`;
         scenes.push({
           name: closeName,
           amount: closeSceneLights.length,
@@ -777,13 +780,11 @@ function createScenesFromLightData(
  * Hàm chung để xử lý dữ liệu CSV và tạo scenes
  * @param rows Dữ liệu CSV đã parse
  * @param cabinetName Tên tủ (tùy chọn)
- * @param cabinetIndex Chỉ số tủ (tùy chọn)
  * @returns Kết quả xử lý scene
  */
 function processCSVDataCommon(
   rows: CSVRow[],
-  cabinetName?: string,
-  cabinetIndex?: number
+  cabinetName?: string
 ): SceneProcessingResult {
   // Tìm thông tin về scene
   const { sceneNames, sceneColumns } = findSceneHeaderAndNames(
@@ -841,9 +842,10 @@ function processCSVDataCommon(
   // Tạo scenes thông thường
   let scenes: Scene[] = [];
 
-  // Nếu có chỉ số tủ, tạo scenes với tên bao gồm chỉ số tủ
-  if (cabinetIndex !== undefined) {
-    // Tạo scenes thông thường với tên bao gồm chỉ số tủ
+  // Nếu có tên tủ, tạo scenes với tên bao gồm tên tủ
+  if (cabinetName) {
+    // Sử dụng tên đầy đủ của tủ (ví dụ: DMX-LT-GYM)
+    // Tạo scenes thông thường với tên bao gồm tên tủ
     regularSceneNames.forEach((sceneName) => {
       const lights: Light[] = [];
 
@@ -871,9 +873,9 @@ function processCSVDataCommon(
       // Sắp xếp đèn theo group
       lights.sort((a, b) => a.group - b.group);
 
-      // Tạo scene mới với tên bao gồm chỉ số tủ
+      // Tạo scene mới với tên bao gồm tên tủ đầy đủ trong ngoặc đơn
       const scene: Scene = {
-        name: `${sceneName} ${cabinetIndex}`,
+        name: `${sceneName} (${cabinetName})`,
         amount: lights.length,
         lights: [...lights],
         isSequential: false,
@@ -909,14 +911,14 @@ function processCSVDataCommon(
 
   // Nếu có scene MASTER ON/OFF, tạo hai scene MASTER ON và MASTER OFF
   if (masterOnOffIndex !== -1) {
-    const masterScenes = createMasterScenes(allLights, cabinetIndex);
+    const masterScenes = createMasterScenes(allLights, cabinetName);
     scenes.push(...masterScenes);
   }
 
   // Tạo các scene OPEN/CLOSE
   const openCloseScenes = createOpenCloseScenes(
     openCloseLightsByNumber,
-    cabinetIndex
+    cabinetName
   );
   scenes.push(...openCloseScenes);
 
@@ -935,7 +937,25 @@ function processCSVData(rows: CSVRow[]): {
   }
 
   // Sử dụng hàm chung để xử lý dữ liệu
-  const { scenes } = processCSVDataCommon(rows);
+  const { scenes: originalScenes } = processCSVDataCommon(rows);
+
+  // Phân loại scene thành scene thông thường và scene OPEN/CLOSE
+  // Theo yêu cầu, tất cả scene OPEN/CLOSE sẽ được đặt ở cuối danh sách
+  const regularScenes: Scene[] = [];
+  const openCloseScenes: Scene[] = [];
+
+  originalScenes.forEach((scene) => {
+    const sceneName = scene.name.toUpperCase();
+    if (sceneName.startsWith("OPEN") || sceneName.startsWith("CLOSE")) {
+      openCloseScenes.push(scene);
+    } else {
+      regularScenes.push(scene);
+    }
+  });
+
+  // Kết hợp các scene, đặt scene thông thường trước và scene OPEN/CLOSE sau
+  // Điều này đảm bảo tất cả scene OPEN/CLOSE luôn ở cuối danh sách
+  const scenes: Scene[] = [...regularScenes, ...openCloseScenes];
 
   // Tạo schedules với thời gian cố định
   const schedules: Schedule[] = createSchedulesFromScenes(scenes);
@@ -945,7 +965,6 @@ function processCSVData(rows: CSVRow[]): {
 
 // Cached cabinet header keywords
 const CABINET_HEADER_KEYWORDS = ["TỦ ĐIỆN", "TU DIEN"];
-const CABINET_NAME_PATTERN = "DMX-";
 
 /**
  * Tìm tất cả các header của tủ điện trong CSV
@@ -959,22 +978,40 @@ function findCabinetHeaders(
   const DEFAULT_CABINET_NAME = "Tủ không tên";
 
   for (let i = 0; i < rows.length; i++) {
-    const rowValues = Object.values(rows[i]);
+    const row = rows[i];
+    const rowValues = Object.values(row);
     const rowStr = rowValues.join(",").toUpperCase();
 
     // Kiểm tra xem dòng có chứa từ khóa header tủ không
     if (CABINET_HEADER_KEYWORDS.some((keyword) => rowStr.includes(keyword))) {
       let cabinetName = DEFAULT_CABINET_NAME;
 
-      // Tìm tên tủ từ dòng header
-      for (const value of rowValues) {
+      // Tìm cột chứa từ khóa "TỦ ĐIỆN" hoặc "TU DIEN"
+      let tuDienColumnIndex = -1;
+      for (const [key, value] of Object.entries(row)) {
         if (
           value &&
           typeof value === "string" &&
-          value.includes(CABINET_NAME_PATTERN)
+          CABINET_HEADER_KEYWORDS.some((keyword) =>
+            value.toUpperCase().includes(keyword)
+          )
         ) {
-          cabinetName = value.trim();
+          tuDienColumnIndex = parseInt(key);
           break;
+        }
+      }
+
+      // Nếu tìm thấy cột chứa từ khóa "TỦ ĐIỆN", lấy giá trị ở cột tiếp theo
+      if (tuDienColumnIndex !== -1) {
+        const nextColumnIndex = tuDienColumnIndex + 1;
+        const nextColumnValue = row[nextColumnIndex];
+
+        if (
+          nextColumnValue &&
+          typeof nextColumnValue === "string" &&
+          nextColumnValue.trim() !== ""
+        ) {
+          cabinetName = nextColumnValue.trim();
         }
       }
 
@@ -1022,24 +1059,33 @@ function processCSVDataWithSeparateCabinets(rows: CSVRow[]): {
     };
   });
 
-  // Xử lý dữ liệu cho từng tủ
-  const allScenes: Scene[] = [];
+  // Mảng để lưu các scene thông thường và scene OPEN/CLOSE riêng biệt
+  // Theo yêu cầu, tất cả scene OPEN/CLOSE sẽ được đặt ở cuối danh sách, không phân biệt tủ
+  const regularScenes: Scene[] = [];
+  const openCloseScenes: Scene[] = [];
 
   // Xử lý từng tủ
-  cabinets.forEach((cabinet, index) => {
-    const cabinetIndex = index + 1; // 1-based index
+  cabinets.forEach((cabinet) => {
     const cabinetRows = rows.slice(cabinet.startRow, cabinet.endRow + 1);
 
     // Xử lý dữ liệu của tủ hiện tại
-    const { scenes } = processCSVDataForCabinet(
-      cabinetRows,
-      cabinet.name,
-      cabinetIndex
-    );
+    const { scenes } = processCSVDataForCabinet(cabinetRows, cabinet.name);
 
-    // Thêm scenes vào danh sách tổng
-    allScenes.push(...scenes);
+    // Phân loại scene thành scene thông thường và scene OPEN/CLOSE
+    // Tất cả scene OPEN/CLOSE từ mọi tủ sẽ được gom lại và đặt ở cuối danh sách
+    scenes.forEach((scene) => {
+      const sceneName = scene.name.toUpperCase();
+      if (sceneName.startsWith("OPEN") || sceneName.startsWith("CLOSE")) {
+        openCloseScenes.push(scene);
+      } else {
+        regularScenes.push(scene);
+      }
+    });
   });
+
+  // Kết hợp các scene, đặt scene thông thường trước và scene OPEN/CLOSE sau
+  // Điều này đảm bảo tất cả scene OPEN/CLOSE luôn ở cuối danh sách, không phân biệt tủ
+  const allScenes: Scene[] = [...regularScenes, ...openCloseScenes];
 
   // Tạo schedules với thời gian cố định
   const schedules: Schedule[] = createSchedulesFromScenes(allScenes);
@@ -1051,27 +1097,28 @@ function processCSVDataWithSeparateCabinets(rows: CSVRow[]): {
  * Xử lý dữ liệu CSV cho một tủ cụ thể
  * @param rows Dữ liệu CSV của tủ
  * @param cabinetName Tên tủ
- * @param cabinetIndex Chỉ số của tủ (1-based)
  * @returns Object chứa scenes của tủ
  */
 function processCSVDataForCabinet(
   rows: CSVRow[],
-  cabinetName: string,
-  cabinetIndex: number
+  cabinetName: string
 ): SceneProcessingResult {
   // Sử dụng hàm chung để xử lý dữ liệu
-  return processCSVDataCommon(rows, cabinetName, cabinetIndex);
+  return processCSVDataCommon(rows, cabinetName);
 }
 
 /**
  * Tạo schedules từ danh sách scenes (chỉ cho DAY TIME, NIGHT TIME, và LATE TIME)
+ * Mỗi schedule sẽ bao gồm tất cả các scene cùng loại từ tất cả các tủ
+ * Ví dụ: Schedule DAY TIME sẽ bao gồm "DAY TIME (DMX-LT-GYM)", "DAY TIME (DMX-LT-BR1)", v.v.
  * @param scenes Danh sách scenes
  * @returns Danh sách schedules
  */
 function createSchedulesFromScenes(scenes: Scene[]): Schedule[] {
   const schedules: Schedule[] = [];
 
-  // Tạo map để nhóm các scene theo tên cơ bản (không có chỉ số tủ)
+  // Tạo map để nhóm các scene theo tên cơ bản (không bao gồm tên tủ)
+  // Ví dụ: "DAY TIME (DMX-LT-GYM)" và "DAY TIME (DMX-LT-BR1)" sẽ được nhóm vào cùng một key "DAY TIME"
   const sceneGroups: { [key: string]: number[] } = {};
 
   // Tạo map để lưu trữ index của scene theo tên
@@ -1079,31 +1126,36 @@ function createSchedulesFromScenes(scenes: Scene[]): Schedule[] {
   scenes.forEach((scene, index) => {
     sceneIndexMap[scene.name] = index;
 
-    // Lấy tên cơ bản của scene (không có chỉ số tủ)
-    const baseSceneName = scene.name.replace(/\s+\d+$/, "");
+    // Lấy tên cơ bản của scene bằng cách loại bỏ phần tên tủ trong ngoặc đơn
+    // Ví dụ: "DAY TIME (DMX-LT-GYM)" -> "DAY TIME"
+    const baseSceneName = scene.name.replace(/\s+\([^)]+\)$/, "");
 
+    // Khởi tạo mảng nếu chưa tồn tại
     if (!sceneGroups[baseSceneName]) {
       sceneGroups[baseSceneName] = [];
     }
 
-    sceneGroups[baseSceneName].push(index + 1); // 1-based index for scene groups
+    // Thêm index của scene vào nhóm tương ứng (1-based index)
+    sceneGroups[baseSceneName].push(index + 1);
   });
 
-  // Cấu hình thời gian cố định cho các scene
+  // Cấu hình thời gian cố định cho các loại scene
+  // Mỗi loại scene sẽ có một thời gian cố định
   const fixedTimeMap: { [key: string]: { hour: number; minute: number } } = {
-    DAY: { hour: 6, minute: 0 },
-    NIGHT: { hour: 18, minute: 0 },
-    LATE: { hour: 1, minute: 0 },
+    DAY: { hour: 6, minute: 0 }, // DAY TIME: 6:00
+    NIGHT: { hour: 18, minute: 0 }, // NIGHT TIME: 18:00
+    LATE: { hour: 1, minute: 0 }, // LATE TIME: 1:00
   };
 
   // Tạo schedules cho DAY TIME, NIGHT TIME, và LATE TIME
-  // Tìm các scene có tên chứa "DAY", "NIGHT", hoặc "LATE" (không phân biệt hoa thường)
+  // Mỗi schedule sẽ bao gồm tất cả các scene cùng loại từ tất cả các tủ
   Object.entries(sceneGroups).forEach(([baseSceneName, sceneIndices]) => {
     const upperSceneName = baseSceneName.toUpperCase();
 
     // Xác định loại scene và thời gian tương ứng
     let scheduleTime = null;
 
+    // Kiểm tra xem tên scene có chứa từ khóa DAY, NIGHT hoặc LATE không
     if (upperSceneName.includes("DAY")) {
       scheduleTime = fixedTimeMap["DAY"];
     } else if (upperSceneName.includes("NIGHT")) {
@@ -1112,13 +1164,14 @@ function createSchedulesFromScenes(scenes: Scene[]): Schedule[] {
       scheduleTime = fixedTimeMap["LATE"];
     }
 
-    // Nếu là một trong các loại scene cần tạo schedule
+    // Chỉ tạo schedule cho các scene DAY TIME, NIGHT TIME, và LATE TIME
     if (scheduleTime) {
+      // Tạo một schedule mới với tất cả các scene cùng loại từ tất cả các tủ
       schedules.push({
         name: baseSceneName,
         enable: true,
         sceneAmount: sceneIndices.length,
-        sceneGroup: sceneIndices,
+        sceneGroup: sceneIndices, // Bao gồm tất cả các scene cùng loại từ tất cả các tủ
         monday: true,
         tuesday: true,
         wednesday: true,
