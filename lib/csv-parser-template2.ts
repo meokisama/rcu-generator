@@ -295,6 +295,22 @@ function processLightData(
     return DEFAULT_LIGHT_NAME;
   };
 
+  // Hàm helper để kiểm tra xem đèn có nên bỏ qua không
+  const shouldSkipLight = (lightName: string): boolean => {
+    // Bỏ qua đèn có tên trống
+    if (lightName === "" || lightName === DEFAULT_LIGHT_NAME) {
+      return true;
+    }
+
+    // Bỏ qua đèn có tên chứa Fan, open, close (không phân biệt hoa thường)
+    const lowerName = lightName.toLowerCase();
+    return (
+      lowerName.includes("fan") ||
+      lowerName.includes("open") ||
+      lowerName.includes("close")
+    );
+  };
+
   // Hàm helper để lấy giá trị độ sáng cho các scene
   const getSceneValues = (row: CSVRow): { [key: string]: number } => {
     const sceneValues: { [key: string]: number } = {};
@@ -319,6 +335,10 @@ function processLightData(
     if (!valid) continue;
 
     const lightName = getLightName(row);
+
+    // Bỏ qua đèn có tên trống hoặc chứa Fan, open, close
+    if (shouldSkipLight(lightName)) continue;
+
     const sceneValues = getSceneValues(row);
 
     // Lưu thông tin đèn vào map
