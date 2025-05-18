@@ -471,6 +471,7 @@ function createScenes(
 
 /**
  * Tạo schedules từ danh sách scenes và thông tin thời gian
+ * Trong chế độ tủ riêng, tạo một schedule duy nhất cho mỗi loại scene (cùng tên cơ bản)
  * @param scenes Danh sách scenes
  * @param sceneTimeInfo Thông tin thời gian của các scene
  * @returns Danh sách schedules
@@ -481,41 +482,92 @@ function createSchedulesFromScenesWithTime(
 ): Schedule[] {
   const schedules: Schedule[] = [];
 
-  // Tạo map để lưu trữ index của scene theo tên
-  const sceneIndexMap: { [key: string]: number } = {};
+  // Tạo map để nhóm các scene theo tên cơ bản (không bao gồm tên tủ)
+  // Ví dụ: "DAY TIME (DMX-LT-GYM)" và "DAY TIME (DMX-LT-BR1)" sẽ được nhóm vào cùng một key "DAY TIME"
+  const sceneGroups: { [key: string]: number[] } = {};
+
+  // Tạo map để lưu trữ thông tin thời gian theo tên cơ bản của scene
+  const baseSceneTimeInfo: {
+    [key: string]: { hour: number; minute: number } | null;
+  } = {};
+
+  // Xử lý từng scene để nhóm theo tên cơ bản
   scenes.forEach((scene, index) => {
-    sceneIndexMap[scene.name] = index;
+    // Lấy tên cơ bản của scene bằng cách loại bỏ phần tên tủ trong ngoặc đơn
+    // Ví dụ: "DAY TIME (DMX-LT-GYM)" -> "DAY TIME"
+    const baseSceneName = scene.name.replace(/\s+\([^)]+\)$/, "");
+
+    // Khởi tạo mảng nếu chưa tồn tại
+    if (!sceneGroups[baseSceneName]) {
+      sceneGroups[baseSceneName] = [];
+
+      // Tìm thông tin thời gian cho tên cơ bản này
+      // Kiểm tra theo thứ tự ưu tiên:
+      // 1. Tên chính xác
+      // 2. Tên cơ bản là tiền tố của tên thời gian
+      // 3. Tên thời gian là tiền tố của tên cơ bản
+
+      // Kiểm tra tên chính xác trước
+      if (sceneTimeInfo[baseSceneName]) {
+        baseSceneTimeInfo[baseSceneName] = sceneTimeInfo[baseSceneName];
+      } else {
+        // Nếu không tìm thấy tên chính xác, thử các phương pháp khác
+        let found = false;
+
+        // Kiểm tra tên cơ bản là tiền tố của tên thời gian
+        for (const [timeSceneName, timeInfo] of Object.entries(sceneTimeInfo)) {
+          if (timeSceneName.startsWith(baseSceneName)) {
+            baseSceneTimeInfo[baseSceneName] = timeInfo;
+
+            found = true;
+            break;
+          }
+        }
+
+        // Nếu vẫn không tìm thấy, kiểm tra tên thời gian là tiền tố của tên cơ bản
+        if (!found) {
+          for (const [timeSceneName, timeInfo] of Object.entries(
+            sceneTimeInfo
+          )) {
+            if (baseSceneName.startsWith(timeSceneName)) {
+              baseSceneTimeInfo[baseSceneName] = timeInfo;
+
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Thêm index của scene vào nhóm tương ứng (1-based index)
+    sceneGroups[baseSceneName].push(index + 1);
   });
 
   // Tạo schedules cho các scene có thông tin thời gian
-  Object.entries(sceneTimeInfo).forEach(([sceneName, timeInfo]) => {
+  // Mỗi schedule sẽ bao gồm tất cả các scene cùng loại từ tất cả các tủ
+  Object.entries(sceneGroups).forEach(([baseSceneName, sceneIndices]) => {
+    // Lấy thông tin thời gian cho tên cơ bản này
+    const timeInfo = baseSceneTimeInfo[baseSceneName];
+
     // Bỏ qua nếu không có thông tin thời gian
     if (!timeInfo) return;
 
-    // Tìm scene tương ứng
-    const sceneIndex = scenes.findIndex(
-      (scene) =>
-        scene.name === sceneName || scene.name.startsWith(`${sceneName} (`)
-    );
-
-    if (sceneIndex !== -1) {
-      // Tạo schedule mới
-      schedules.push({
-        name: `Schedule ${sceneName}`,
-        enable: true,
-        sceneAmount: 1,
-        sceneGroup: [sceneIndex + 1], // 1-based index
-        monday: true,
-        tuesday: true,
-        wednesday: true,
-        thursday: true,
-        friday: true,
-        saturday: true,
-        sunday: true,
-        hour: timeInfo.hour,
-        minute: timeInfo.minute,
-      });
-    }
+    // Tạo schedule mới với tất cả các scene cùng loại từ tất cả các tủ
+    schedules.push({
+      name: `Schedule ${baseSceneName}`,
+      enable: true,
+      sceneAmount: sceneIndices.length,
+      sceneGroup: sceneIndices, // Bao gồm tất cả các scene cùng loại từ tất cả các tủ
+      monday: true,
+      tuesday: true,
+      wednesday: true,
+      thursday: true,
+      friday: true,
+      saturday: true,
+      sunday: true,
+      hour: timeInfo.hour,
+      minute: timeInfo.minute,
+    });
   });
 
   return schedules;
@@ -814,81 +866,81 @@ function processCSVTemplate2WithSeparateCabinets(rows: CSVRow[]): {
         allScenes.push(scene);
       });
 
-      // Chỉ tạo MASTER ON/OFF cho tủ đầu tiên
-      if (cabinet.name === cabinetHeaders[0].name) {
-        // Tạo MASTER ON scene
-        const masterOnLights: Light[] = [];
-        Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
-          const group = parseInt(groupStr);
-          masterOnLights.push({
-            name: lightInfo.name,
-            group,
-            value: 100,
-          });
+      // Tạo MASTER ON/OFF cho mỗi tủ
+      // Tạo MASTER ON scene
+      const masterOnLights: Light[] = [];
+      Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
+        const group = parseInt(groupStr);
+        masterOnLights.push({
+          name: lightInfo.name,
+          group,
+          value: 100,
         });
+      });
 
-        // Kiểm tra xem các group có liên tục không
-        const isOnGroupContinuous = checkContinuousGroups(masterOnLights);
-        const masterOnName = "MASTER ON";
+      // Kiểm tra xem các group có liên tục không
+      const isOnGroupContinuous = checkContinuousGroups(masterOnLights);
+      // Thêm tên tủ vào tên scene MASTER ON
+      const masterOnName = `MASTER ON (${cabinet.name})`;
 
-        if (isOnGroupContinuous) {
-          // Nếu các group liên tục, sử dụng mode group liên tục
-          const minGroup = Math.min(
-            ...masterOnLights.map((light) => light.group)
-          );
-          allScenes.push({
-            name: masterOnName,
-            amount: masterOnLights.length,
-            lights: [{ name: DEFAULT_LIGHT_NAME, group: minGroup, value: 100 }],
-            isSequential: true,
-            startGroup: minGroup,
-          });
-        } else {
-          // Nếu các group không liên tục, sử dụng mode thông thường
-          allScenes.push({
-            name: masterOnName,
-            amount: masterOnLights.length,
-            lights: masterOnLights,
-            isSequential: false,
-          });
-        }
-
-        // Tạo MASTER OFF scene
-        const masterOffLights: Light[] = [];
-        Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
-          const group = parseInt(groupStr);
-          masterOffLights.push({
-            name: lightInfo.name,
-            group,
-            value: 0,
-          });
+      if (isOnGroupContinuous) {
+        // Nếu các group liên tục, sử dụng mode group liên tục
+        const minGroup = Math.min(
+          ...masterOnLights.map((light) => light.group)
+        );
+        allScenes.push({
+          name: masterOnName,
+          amount: masterOnLights.length,
+          lights: [{ name: DEFAULT_LIGHT_NAME, group: minGroup, value: 100 }],
+          isSequential: true,
+          startGroup: minGroup,
         });
+      } else {
+        // Nếu các group không liên tục, sử dụng mode thông thường
+        allScenes.push({
+          name: masterOnName,
+          amount: masterOnLights.length,
+          lights: masterOnLights,
+          isSequential: false,
+        });
+      }
 
-        // Kiểm tra xem các group có liên tục không
-        const isOffGroupContinuous = checkContinuousGroups(masterOffLights);
-        const masterOffName = "MASTER OFF";
+      // Tạo MASTER OFF scene
+      const masterOffLights: Light[] = [];
+      Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
+        const group = parseInt(groupStr);
+        masterOffLights.push({
+          name: lightInfo.name,
+          group,
+          value: 0,
+        });
+      });
 
-        if (isOffGroupContinuous) {
-          // Nếu các group liên tục, sử dụng mode group liên tục
-          const minGroup = Math.min(
-            ...masterOffLights.map((light) => light.group)
-          );
-          allScenes.push({
-            name: masterOffName,
-            amount: masterOffLights.length,
-            lights: [{ name: DEFAULT_LIGHT_NAME, group: minGroup, value: 0 }],
-            isSequential: true,
-            startGroup: minGroup,
-          });
-        } else {
-          // Nếu các group không liên tục, sử dụng mode thông thường
-          allScenes.push({
-            name: masterOffName,
-            amount: masterOffLights.length,
-            lights: masterOffLights,
-            isSequential: false,
-          });
-        }
+      // Kiểm tra xem các group có liên tục không
+      const isOffGroupContinuous = checkContinuousGroups(masterOffLights);
+      // Thêm tên tủ vào tên scene MASTER OFF
+      const masterOffName = `MASTER OFF (${cabinet.name})`;
+
+      if (isOffGroupContinuous) {
+        // Nếu các group liên tục, sử dụng mode group liên tục
+        const minGroup = Math.min(
+          ...masterOffLights.map((light) => light.group)
+        );
+        allScenes.push({
+          name: masterOffName,
+          amount: masterOffLights.length,
+          lights: [{ name: DEFAULT_LIGHT_NAME, group: minGroup, value: 0 }],
+          isSequential: true,
+          startGroup: minGroup,
+        });
+      } else {
+        // Nếu các group không liên tục, sử dụng mode thông thường
+        allScenes.push({
+          name: masterOffName,
+          amount: masterOffLights.length,
+          lights: masterOffLights,
+          isSequential: false,
+        });
       }
     } catch (error) {
       console.error(`Error processing cabinet ${cabinet.name}:`, error);
