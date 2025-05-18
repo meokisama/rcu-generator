@@ -20,6 +20,15 @@ interface OpenCloseLights {
   [key: string]: { open: Light[]; close: Light[] };
 }
 
+// Interface for special lights (ON/OFF, HIGH, MID, LOW + number)
+interface SpecialLights {
+  [key: string]: {
+    // key is the type+number, e.g., "ON/OFF 1", "HIGH 1"
+    name: string; // Full name of the light
+    group: number; // Group number
+  };
+}
+
 // Define a more specific type for CSV row data
 interface CSVRow {
   [key: string]: string | number | null;
@@ -283,12 +292,16 @@ function processLightData(
   lightsByGroup: LightsByGroup;
   openCloseLightsByNumber: OpenCloseLights;
   openCloseGroups: Set<number>;
+  specialLights: SpecialLights;
+  specialLightGroups: Set<number>;
   groupCounts: { [key: number]: number };
 } {
   // Khởi tạo các cấu trúc dữ liệu kết quả
   const lightsByGroup: LightsByGroup = {};
   const openCloseLightsByNumber: OpenCloseLights = {};
   const openCloseGroups = new Set<number>();
+  const specialLights: SpecialLights = {};
+  const specialLightGroups = new Set<number>();
   const groupCounts: { [key: number]: number } = {};
 
   // Hàm helper để lấy thông tin group từ một dòng
@@ -373,6 +386,11 @@ function processLightData(
     const isCloseLight = lightName.toUpperCase().startsWith("CLOSE");
     const isOpenOrCloseLight = isOpenLight || isCloseLight;
 
+    // Kiểm tra xem đèn có phải là đèn đặc biệt không (ON/OFF, HIGH, MID, LOW + số)
+    // Hỗ trợ cả trường hợp có dấu cách và không có dấu cách
+    const specialMatch = lightName.match(/^(ON\/OFF|HIGH|MID|LOW)\s*(\d+)$/i);
+    const isSpecialLight = specialMatch !== null;
+
     // Lấy giá trị độ sáng cho từng scene
     const sceneValues = getSceneValues(row);
 
@@ -407,7 +425,25 @@ function processLightData(
 
       // Thêm group vào danh sách các group đèn OPEN/CLOSE
       openCloseGroups.add(groupNumber);
-    } else {
+    }
+    // Xử lý đèn đặc biệt (ON/OFF, HIGH, MID, LOW + số)
+    else if (isSpecialLight && specialMatch) {
+      // Lấy loại và số của đèn đặc biệt (ví dụ: ON/OFF 1 -> "ON/OFF", "1")
+      const specialType = specialMatch[1]; // ON/OFF, HIGH, MID, LOW
+      const specialNumber = specialMatch[2]; // Số
+      const specialKey = `${specialType} ${specialNumber}`; // Ví dụ: "ON/OFF 1"
+
+      // Lưu thông tin đèn đặc biệt
+      specialLights[specialKey] = {
+        name: lightName,
+        group: groupNumber,
+      };
+
+      // Thêm group vào danh sách các group đèn đặc biệt
+      specialLightGroups.add(groupNumber);
+    }
+    // Xử lý đèn thông thường
+    else {
       // Kiểm tra xem group có trùng lặp không
       const isDuplicateGroup = groupCounts[groupNumber] > 1;
 
@@ -425,7 +461,7 @@ function processLightData(
         (hasAnyBrightnessValue &&
           !Object.values(existingLight.values).some((value) => value !== 100))
       ) {
-        // Lưu thông tin đèn thông thường theo group (không phải OPEN/CLOSE)
+        // Lưu thông tin đèn thông thường theo group (không phải OPEN/CLOSE hoặc đèn đặc biệt)
         lightsByGroup[groupNumber] = {
           // Nếu group trùng lặp, sử dụng tên group, ngược lại sử dụng tên đèn gốc
           name: isDuplicateGroup ? groupName : lightName,
@@ -439,6 +475,8 @@ function processLightData(
     lightsByGroup,
     openCloseLightsByNumber,
     openCloseGroups,
+    specialLights,
+    specialLightGroups,
     groupCounts,
   };
 }
@@ -521,6 +559,50 @@ function createMasterScenes(allLights: Light[], cabinetName?: string): Scene[] {
       isSequential: false,
     });
   }
+
+  return scenes;
+}
+
+/**
+ * Tạo scenes cho đèn đặc biệt (ON/OFF, HIGH, MID, LOW + số)
+ * @param specialLights Thông tin đèn đặc biệt
+ * @param cabinetName Tên tủ (tùy chọn)
+ * @returns Danh sách scene cho đèn đặc biệt
+ */
+function createSpecialLightScenes(
+  specialLights: SpecialLights,
+  cabinetName?: string
+): Scene[] {
+  const scenes: Scene[] = [];
+
+  // Sử dụng tên đầy đủ của tủ trong ngoặc đơn (ví dụ: (DMX-LT-GYM))
+  let cabinetSuffix = "";
+  if (cabinetName) {
+    cabinetSuffix = ` (${cabinetName})`;
+  }
+
+  // Tạo scene cho mỗi đèn đặc biệt
+  Object.entries(specialLights).forEach(([key, lightInfo]) => {
+    // Tạo scene mới với tên là tên đèn đặc biệt
+    const sceneName = `${key}${cabinetSuffix}`;
+
+    // Tạo danh sách đèn cho scene này (chỉ có 1 đèn với độ sáng 100%)
+    const lights: Light[] = [
+      {
+        name: lightInfo.name,
+        group: lightInfo.group,
+        value: 100, // Đèn đặc biệt luôn có độ sáng 100%
+      },
+    ];
+
+    // Thêm scene mới
+    scenes.push({
+      name: sceneName,
+      amount: lights.length,
+      lights: lights,
+      isSequential: false,
+    });
+  });
 
   return scenes;
 }
@@ -707,12 +789,14 @@ export function parseCSV(
  * Tạo scenes từ dữ liệu đèn đã xử lý
  * @param lightsByGroup Thông tin đèn theo group
  * @param openCloseGroups Danh sách group đèn OPEN/CLOSE
+ * @param specialLightGroups Danh sách group đèn đặc biệt
  * @param sceneNames Danh sách tên scene
  * @returns Danh sách scene đã tạo
  */
 function createScenesFromLightData(
   lightsByGroup: LightsByGroup,
   openCloseGroups: Set<number>,
+  specialLightGroups: Set<number>,
   sceneNames: string[]
 ): Scene[] {
   const scenes: Scene[] = [];
@@ -721,12 +805,12 @@ function createScenesFromLightData(
   sceneNames.forEach((sceneName) => {
     const lights: Light[] = [];
 
-    // Thêm đèn từ mỗi group vào scene (trừ đèn OPEN/CLOSE)
+    // Thêm đèn từ mỗi group vào scene (trừ đèn OPEN/CLOSE và đèn đặc biệt)
     Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
       const group = parseInt(groupStr);
 
-      // Bỏ qua các đèn thuộc group OPEN/CLOSE
-      if (openCloseGroups.has(group)) {
+      // Bỏ qua các đèn thuộc group OPEN/CLOSE hoặc đèn đặc biệt
+      if (openCloseGroups.has(group) || specialLightGroups.has(group)) {
         return;
       }
 
@@ -799,8 +883,13 @@ function processCSVDataCommon(
   );
 
   // Xử lý dữ liệu đèn
-  const { lightsByGroup, openCloseLightsByNumber, openCloseGroups } =
-    processLightData(rows, groupColumn, nameColumn, sceneColumns, sceneNames);
+  const {
+    lightsByGroup,
+    openCloseLightsByNumber,
+    openCloseGroups,
+    specialLights,
+    specialLightGroups,
+  } = processLightData(rows, groupColumn, nameColumn, sceneColumns, sceneNames);
 
   // Kiểm tra xem có scene chứa MASTER ON/OFF không
   const masterOnOffIndex = sceneNames.findIndex((name) => {
@@ -815,12 +904,12 @@ function processCSVDataCommon(
   // Tạo danh sách tất cả các đèn (không bao gồm OPEN/CLOSE)
   const allLights: Light[] = [];
 
-  // Thêm đèn từ lightsByGroup (không bao gồm OPEN/CLOSE)
+  // Thêm đèn từ lightsByGroup (không bao gồm OPEN/CLOSE và đèn đặc biệt)
   Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
     const group = parseInt(groupStr);
 
-    // Bỏ qua các đèn thuộc group OPEN/CLOSE
-    if (openCloseGroups.has(group)) {
+    // Bỏ qua các đèn thuộc group OPEN/CLOSE hoặc đèn đặc biệt
+    if (openCloseGroups.has(group) || specialLightGroups.has(group)) {
       return;
     }
 
@@ -834,10 +923,20 @@ function processCSVDataCommon(
   // Sắp xếp tất cả đèn theo group
   allLights.sort((a, b) => a.group - b.group);
 
-  // Tạo danh sách scene thông thường (không bao gồm MASTER ON/OFF)
-  const regularSceneNames = sceneNames.filter(
-    (_, index) => index !== masterOnOffIndex
-  );
+  // Lọc ra các scene đặc biệt (ON/OFF, HIGH, MID, LOW + số)
+  // Chỉ sử dụng để lọc regularSceneNames, không cần lưu kết quả
+
+  // Tạo danh sách scene thông thường (không bao gồm MASTER ON/OFF và scene đặc biệt)
+  const regularSceneNames = sceneNames.filter((name, index) => {
+    const upperName = name.toUpperCase();
+    return (
+      index !== masterOnOffIndex &&
+      !upperName.startsWith("ON/OFF") &&
+      !upperName.startsWith("HIGH") &&
+      !upperName.startsWith("MID") &&
+      !upperName.startsWith("LOW")
+    );
+  });
 
   // Tạo scenes thông thường
   let scenes: Scene[] = [];
@@ -849,12 +948,12 @@ function processCSVDataCommon(
     regularSceneNames.forEach((sceneName) => {
       const lights: Light[] = [];
 
-      // Thêm đèn từ mỗi group vào scene (trừ đèn OPEN/CLOSE)
+      // Thêm đèn từ mỗi group vào scene (trừ đèn OPEN/CLOSE và đèn đặc biệt)
       Object.entries(lightsByGroup).forEach(([groupStr, lightInfo]) => {
         const group = parseInt(groupStr);
 
-        // Bỏ qua các đèn thuộc group OPEN/CLOSE
-        if (openCloseGroups.has(group)) {
+        // Bỏ qua các đèn thuộc group OPEN/CLOSE hoặc đèn đặc biệt
+        if (openCloseGroups.has(group) || specialLightGroups.has(group)) {
           return;
         }
 
@@ -905,6 +1004,7 @@ function processCSVDataCommon(
     scenes = createScenesFromLightData(
       lightsByGroup,
       openCloseGroups,
+      specialLightGroups,
       regularSceneNames
     );
   }
@@ -921,6 +1021,13 @@ function processCSVDataCommon(
     cabinetName
   );
   scenes.push(...openCloseScenes);
+
+  // Tạo các scene cho đèn đặc biệt (ON/OFF, HIGH, MID, LOW + số)
+  const specialLightScenes = createSpecialLightScenes(
+    specialLights,
+    cabinetName
+  );
+  scenes.push(...specialLightScenes);
 
   return { scenes };
 }
@@ -939,23 +1046,64 @@ function processCSVData(rows: CSVRow[]): {
   // Sử dụng hàm chung để xử lý dữ liệu
   const { scenes: originalScenes } = processCSVDataCommon(rows);
 
-  // Phân loại scene thành scene thông thường và scene OPEN/CLOSE
+  // Phân loại scene thành scene thông thường, scene OPEN/CLOSE và scene đặc biệt
   // Theo yêu cầu, tất cả scene OPEN/CLOSE sẽ được đặt ở cuối danh sách
   const regularScenes: Scene[] = [];
   const openCloseScenes: Scene[] = [];
+  const specialScenes: Scene[] = [];
 
+  // Tạo một Map để lưu trữ scene đặc biệt theo tên (không phân biệt hoa thường)
+  const specialSceneMap = new Map<string, Scene>();
+
+  // Trước tiên, tìm tất cả các scene đặc biệt
   originalScenes.forEach((scene) => {
     const sceneName = scene.name.toUpperCase();
+    // Kiểm tra xem scene có phải là scene đặc biệt không (ON/OFF, HIGH, MID, LOW + số)
+    // Hỗ trợ cả trường hợp có dấu cách và không có dấu cách
+    if (
+      sceneName.match(/^ON\/OFF\s*\d+/) ||
+      sceneName.match(/^HIGH\s*\d+/) ||
+      sceneName.match(/^MID\s*\d+/) ||
+      sceneName.match(/^LOW\s*\d+/)
+    ) {
+      // Đây là scene đặc biệt, lưu vào map theo tên
+      specialSceneMap.set(sceneName, scene);
+    }
+  });
+
+  // Thêm các scene đặc biệt vào danh sách (chỉ lấy một scene cho mỗi tên)
+  specialSceneMap.forEach((scene) => {
+    specialScenes.push(scene);
+  });
+
+  // Sau đó, phân loại các scene còn lại
+  originalScenes.forEach((scene) => {
+    const sceneName = scene.name.toUpperCase();
+
+    // Nếu scene này đã được xử lý như một scene đặc biệt, bỏ qua
+    if (specialSceneMap.has(sceneName)) {
+      return;
+    }
+
     if (sceneName.startsWith("OPEN") || sceneName.startsWith("CLOSE")) {
       openCloseScenes.push(scene);
-    } else {
+    } else if (
+      !sceneName.match(/^ON\/OFF\s*\d+/) &&
+      !sceneName.match(/^HIGH\s*\d+/) &&
+      !sceneName.match(/^MID\s*\d+/) &&
+      !sceneName.match(/^LOW\s*\d+/)
+    ) {
+      // Chỉ thêm vào regularScenes nếu không phải là scene đặc biệt
       regularScenes.push(scene);
     }
   });
 
-  // Kết hợp các scene, đặt scene thông thường trước và scene OPEN/CLOSE sau
-  // Điều này đảm bảo tất cả scene OPEN/CLOSE luôn ở cuối danh sách
-  const scenes: Scene[] = [...regularScenes, ...openCloseScenes];
+  // Kết hợp các scene, đặt scene thông thường trước, scene đặc biệt ở giữa và scene OPEN/CLOSE sau
+  const scenes: Scene[] = [
+    ...regularScenes,
+    ...specialScenes,
+    ...openCloseScenes,
+  ];
 
   // Tạo schedules với thời gian cố định
   const schedules: Schedule[] = createSchedulesFromScenes(scenes);
@@ -1059,10 +1207,14 @@ function processCSVDataWithSeparateCabinets(rows: CSVRow[]): {
     };
   });
 
-  // Mảng để lưu các scene thông thường và scene OPEN/CLOSE riêng biệt
+  // Mảng để lưu các scene thông thường, scene đặc biệt và scene OPEN/CLOSE riêng biệt
   // Theo yêu cầu, tất cả scene OPEN/CLOSE sẽ được đặt ở cuối danh sách, không phân biệt tủ
   const regularScenes: Scene[] = [];
+  const specialScenes: Scene[] = [];
   const openCloseScenes: Scene[] = [];
+
+  // Tạo một Map để lưu trữ scene đặc biệt theo tên (không phân biệt hoa thường)
+  const specialSceneMap = new Map<string, Scene>();
 
   // Xử lý từng tủ
   cabinets.forEach((cabinet) => {
@@ -1071,21 +1223,65 @@ function processCSVDataWithSeparateCabinets(rows: CSVRow[]): {
     // Xử lý dữ liệu của tủ hiện tại
     const { scenes } = processCSVDataForCabinet(cabinetRows, cabinet.name);
 
-    // Phân loại scene thành scene thông thường và scene OPEN/CLOSE
-    // Tất cả scene OPEN/CLOSE từ mọi tủ sẽ được gom lại và đặt ở cuối danh sách
+    // Trước tiên, tìm tất cả các scene đặc biệt
     scenes.forEach((scene) => {
       const sceneName = scene.name.toUpperCase();
+      // Kiểm tra xem scene có phải là scene đặc biệt không (ON/OFF, HIGH, MID, LOW + số)
+      // Hỗ trợ cả trường hợp có dấu cách và không có dấu cách
+      if (
+        sceneName.match(/^ON\/OFF\s*\d+/) ||
+        sceneName.match(/^HIGH\s*\d+/) ||
+        sceneName.match(/^MID\s*\d+/) ||
+        sceneName.match(/^LOW\s*\d+/)
+      ) {
+        // Đây là scene đặc biệt, lưu vào map theo tên
+        specialSceneMap.set(sceneName, scene);
+      }
+    });
+  });
+
+  // Thêm các scene đặc biệt vào danh sách (chỉ lấy một scene cho mỗi tên)
+  specialSceneMap.forEach((scene) => {
+    specialScenes.push(scene);
+  });
+
+  // Xử lý từng tủ lần nữa để phân loại các scene còn lại
+  cabinets.forEach((cabinet) => {
+    const cabinetRows = rows.slice(cabinet.startRow, cabinet.endRow + 1);
+
+    // Xử lý dữ liệu của tủ hiện tại
+    const { scenes } = processCSVDataForCabinet(cabinetRows, cabinet.name);
+
+    // Phân loại các scene còn lại
+    scenes.forEach((scene) => {
+      const sceneName = scene.name.toUpperCase();
+
+      // Nếu scene này đã được xử lý như một scene đặc biệt, bỏ qua
+      if (specialSceneMap.has(sceneName)) {
+        return;
+      }
+
       if (sceneName.startsWith("OPEN") || sceneName.startsWith("CLOSE")) {
         openCloseScenes.push(scene);
-      } else {
+      } else if (
+        !sceneName.match(/^ON\/OFF\s*\d+/) &&
+        !sceneName.match(/^HIGH\s*\d+/) &&
+        !sceneName.match(/^MID\s*\d+/) &&
+        !sceneName.match(/^LOW\s*\d+/)
+      ) {
+        // Chỉ thêm vào regularScenes nếu không phải là scene đặc biệt
         regularScenes.push(scene);
       }
     });
   });
 
-  // Kết hợp các scene, đặt scene thông thường trước và scene OPEN/CLOSE sau
+  // Kết hợp các scene, đặt scene thông thường trước, scene đặc biệt ở giữa và scene OPEN/CLOSE sau
   // Điều này đảm bảo tất cả scene OPEN/CLOSE luôn ở cuối danh sách, không phân biệt tủ
-  const allScenes: Scene[] = [...regularScenes, ...openCloseScenes];
+  const allScenes: Scene[] = [
+    ...regularScenes,
+    ...specialScenes,
+    ...openCloseScenes,
+  ];
 
   // Tạo schedules với thời gian cố định
   const schedules: Schedule[] = createSchedulesFromScenes(allScenes);
