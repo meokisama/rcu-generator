@@ -49,6 +49,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import LightList from "./light-list";
 import Image from "next/image";
 import { parseCSV } from "@/lib/csv-parser";
+import { parseCSVTemplate2 } from "@/lib/csv-parser-template2";
 
 // Lazy loaded components
 const OverviewDialog = lazy(() => import("@/components/home/drag-dialog"));
@@ -1250,8 +1251,10 @@ export default function Generator() {
 
   // Hàm xử lý khi người dùng đã chọn chế độ import
   const handleImportCSVConfirm = useCallback(
-    async (separateCabinets: boolean) => {
+    async (options: { separateCabinets: boolean; templateType: string }) => {
       if (!pendingCSVFile) return;
+
+      const { separateCabinets, templateType } = options;
 
       // Hiển thị toast loading và lưu ID để có thể đóng sau này
       const loadingToastId = toast.loading("Đang xử lý file CSV...");
@@ -1267,9 +1270,15 @@ export default function Generator() {
           reader.readAsText(pendingCSVFile);
         });
 
-        // Sử dụng hàm parseCSV để chuyển đổi dữ liệu CSV thành scenes và schedules
-        const { scenes: parsedScenes, schedules: parsedSchedules } =
-          await parseCSV(content, separateCabinets);
+        // Sử dụng hàm parse tương ứng với loại template
+        let parsedData;
+        if (templateType === "template2") {
+          parsedData = await parseCSVTemplate2(content, separateCabinets);
+        } else {
+          parsedData = await parseCSV(content, separateCabinets);
+        }
+
+        const { scenes: parsedScenes, schedules: parsedSchedules } = parsedData;
 
         if (parsedScenes.length === 0) {
           // Đóng toast loading
@@ -1293,12 +1302,15 @@ export default function Generator() {
           ? "chế độ điều khiển tủ riêng biệt"
           : "chế độ điều khiển toàn bộ tủ";
 
+        const templateDescription =
+          templateType === "template2" ? "template 2" : "template tiêu chuẩn";
+
         toast.success("Nhập dữ liệu CSV thành công!", {
           description: `Đã nhập ${parsedScenes.length} scene${
             parsedSchedules.length > 0
               ? ` và ${parsedSchedules.length} schedule`
               : ""
-          } từ file CSV với ${modeDescription}.`,
+          } từ file CSV (${templateDescription}) với ${modeDescription}.`,
           duration: 6000,
         });
 
@@ -1604,7 +1616,7 @@ export default function Generator() {
                           className="text-gray-700 cursor-pointer"
                         >
                           <FileSpreadsheet className="h-4 w-4" />
-                          Nhập full dữ liệu (CSV)
+                          Nhập dữ liệu từ CSV
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

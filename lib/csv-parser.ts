@@ -35,7 +35,7 @@ interface SceneProcessingResult {
  * @param lights Danh sách đèn cần kiểm tra
  * @returns true nếu các group liên tục và tất cả đèn có cùng độ sáng, false nếu không
  */
-function checkContinuousGroups(lights: Light[]): boolean {
+export function checkContinuousGroups(lights: Light[]): boolean {
   if (lights.length <= 1) return true;
 
   // Tìm giá trị độ sáng đầu tiên và kiểm tra xem tất cả đèn có cùng độ sáng không
@@ -73,7 +73,7 @@ const PERCENT_REGEX = /%/g;
  * @param value Giá trị độ sáng cần chuyển đổi
  * @returns Giá trị độ sáng dạng số (0-100)
  */
-function convertBrightnessValue(
+export function convertBrightnessValue(
   value: string | number | null | undefined
 ): number {
   // Giá trị mặc định là 100
@@ -1114,7 +1114,7 @@ function processCSVDataForCabinet(
  * @param scenes Danh sách scenes
  * @returns Danh sách schedules
  */
-function createSchedulesFromScenes(scenes: Scene[]): Schedule[] {
+export function createSchedulesFromScenes(scenes: Scene[]): Schedule[] {
   const schedules: Schedule[] = [];
 
   // Tạo map để nhóm các scene theo tên cơ bản (không bao gồm tên tủ)
