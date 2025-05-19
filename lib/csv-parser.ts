@@ -270,7 +270,6 @@ function findGroupAndNameColumns(
 
 // Cached regular expressions
 const GROUP_NUMBER_REGEX = /GROUP\s*(\d+)/i;
-const OPEN_CLOSE_NUMBER_REGEX = /\d+/;
 const DEFAULT_LIGHT_NAME = "Đèn chưa đặt tên";
 
 /**
@@ -396,11 +395,14 @@ function processLightData(
 
     // Xử lý đèn OPEN/CLOSE
     if (isOpenOrCloseLight) {
-      // Xác định số của OPEN/CLOSE (ví dụ: OPEN 1 -> 1)
-      const match = lightName.match(OPEN_CLOSE_NUMBER_REGEX);
-      if (!match) continue;
+      // Xác định số/ID của OPEN/CLOSE (ví dụ: OPEN 1 -> 1, OPEN SP1 -> SP1)
+      // Trích xuất phần sau "OPEN " hoặc "CLOSE "
+      const prefix = isOpenLight ? "OPEN" : "CLOSE";
+      const suffix = lightName.substring(prefix.length).trim();
 
-      const openCloseNumber = match[0];
+      // Sử dụng toàn bộ phần sau prefix làm ID thay vì chỉ lấy số
+      const openCloseNumber = suffix;
+      if (!openCloseNumber || openCloseNumber === "") continue;
 
       // Khởi tạo cấu trúc lưu trữ nếu chưa tồn tại
       if (!openCloseLightsByNumber[openCloseNumber]) {
@@ -1098,11 +1100,11 @@ function processCSVData(rows: CSVRow[]): {
     }
   });
 
-  // Kết hợp các scene, đặt scene thông thường trước, scene đặc biệt ở giữa và scene OPEN/CLOSE sau
+  // Kết hợp các scene, đặt scene thông thường trước, scene OPEN/CLOSE ở giữa, và scene đặc biệt sau
   const scenes: Scene[] = [
     ...regularScenes,
-    ...specialScenes,
     ...openCloseScenes,
+    ...specialScenes,
   ];
 
   // Tạo schedules với thời gian cố định
@@ -1275,12 +1277,12 @@ function processCSVDataWithSeparateCabinets(rows: CSVRow[]): {
     });
   });
 
-  // Kết hợp các scene, đặt scene thông thường trước, scene đặc biệt ở giữa và scene OPEN/CLOSE sau
-  // Điều này đảm bảo tất cả scene OPEN/CLOSE luôn ở cuối danh sách, không phân biệt tủ
+  // Kết hợp các scene, đặt scene thông thường trước, scene OPEN/CLOSE ở giữa, và scene đặc biệt sau
+  // Điều này đảm bảo tất cả scene thông thường luôn ở đầu danh sách, không phân biệt tủ
   const allScenes: Scene[] = [
     ...regularScenes,
-    ...specialScenes,
     ...openCloseScenes,
+    ...specialScenes,
   ];
 
   // Tạo schedules với thời gian cố định
